@@ -1,0 +1,35 @@
+[
+  {
+    "path": "D:\\Git\\GitDesk",
+    "name": "GitDesk",
+    "added_at": "2026-10-12 19:30:01",
+    "platform": "github",
+    "remote_url": "https://github.com/notebook-mi/GitDesk.git",
+    "full_name": "notebook-mi/GitDesk",
+    "source": "import",
+    "last_sync": "2026-10-12 19:52:39",
+    "remote": "origin"
+  },
+  {
+    "path": "D:\\Git\\AIP-Studio",
+    "name": "AIP-Studio",
+    "added_at": "2026-10-12 19:43:43",
+    "platform": "github",
+    "remote_url": "https://github.com/notebook-mi/AIP-Studio.git",
+    "full_name": "notebook-mi/AIP-Studio",
+    "source": "import",
+    "last_sync": "2026-10-12 19:54:12",
+    "remote": "origin"
+  },
+  {
+    "path": "D:\\Git\\photoWeb",
+    "name": "photoWeb",
+    "added_at": "2026-10-12 20:05:24",
+    "platform": "gitee",
+    "remote_url": "https://gitee.com/notebook-mi/photoWeb.git",
+    "full_name": "notebook-mi/photoWeb",
+    "source": "import",
+    "remote": "origin",
+    "last_sync": "2026-10-12 20:51:30"
+  }
+]

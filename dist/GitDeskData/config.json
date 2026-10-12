@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "accounts": {
+    "github": {
+      "username": "notebook-mi",
+      "token": "dpapi:AQAAANCMnd8BFdERjHoAwE/Cl+sBAAAATPUmc0K2oUikKp/QR0fa4gAAAAAQAAAARwBpAHQARABlAHMAawAAABBmAAAAAQAAIAAAAPX8IISHJVU6DqzPGc3Y0l6Pijtt+CRrtffAoUVww2kAAAAAAA6AAAAAAgAAIAAAAAwsLlDVy/+AHxtok4xH3wKDRXEXTSzdnZMZYS/dtPLwMAAAAHFK56F3RWuQZhMtFvZum+g3zOxuPVRIMaGdTZ3sCeY4DKkR4nfhytTxbjpNipOYMEAAAADDmrbJxzoHS+oaqkc3Hf2FbaaYn69h3iimwXbbgSPswtcmfwwO9KtGQ0c71Q3WKbWJKI5bP8/6iiAQKV25vbzj",
+      "verified": true,
+      "display": "notebook-mi"
+    },
+    "gitee": {
+      "username": "notebook-mi",
+      "token": "dpapi:AQAAANCMnd8BFdERjHoAwE/Cl+sBAAAATPUmc0K2oUikKp/QR0fa4gAAAAAQAAAARwBpAHQARABlAHMAawAAABBmAAAAAQAAIAAAAKQrAEAxDFkM996YA8qW02ScKOI0lCfIz9iNBpKU8NtSAAAAAA6AAAAAAgAAIAAAAD3CPIge2Y92pZZc+vKOYYJ7GVBhaDDyfnAnoRG5Dag7MAAAAAJhbzohax5ShuJ7I9tozgEaLoSFHya8t347O45Ngqg2L3j+kZTwNImsy4d6G3xQEEAAAACwpILBIhKIHp3GvKF+Q1Z2MEj/tVCMipD/XWkFCwXfHxMWvxGZD705lq9qQSQ9qtm0LBqKSBtAdnAYpDMce3oi",
+      "verified": true,
+      "display": "notebook-mi"
+    }
+  },
+  "settings": {
+    "clone_dir": "D:/Git",
+    "page_size": 30,
+    "watch_enabled": true,
+    "watch_interval_ms": 5000,
+    "proxy": "",
+    "git_username": "GitDesk",
+    "git_email": "gitdesk@localhost",
+    "window_geometry": "221,61,1280,820"
+  }
+}

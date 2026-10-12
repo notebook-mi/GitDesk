@@ -410,6 +410,9 @@ _CloneMonitor = TransferMonitor
 NETWORK_ATTEMPTS = 3
 _RETRY_BACKOFF = 1.2
 
+#: 远程跟踪引用 → 远程名（`refs/remotes/origin/main` → `origin`）
+_UPSTREAM_REMOTE_RE = re.compile(r"^refs/remotes/([^/]+)/")
+
 _TRANSIENT_HINTS = (
     "connection aborted",
     "connection reset",
@@ -622,6 +625,15 @@ class SyncState:
     behind: int = 0
     has_upstream: bool = False
     upstream: str = ""
+
+    @property
+    def remote_name(self) -> str:
+        """上游所属的远程名（`refs/remotes/github/main` → `github`）。
+
+        界面用它说明「与哪个远程比较 / 推送到哪个远程」，空串表示上游不是远程分支
+        （例如上游是本地分支或未设置）。
+        """
+        return upstream_remote_name(self.upstream)
 
     @property
     def diverged(self) -> bool:
@@ -1780,6 +1792,15 @@ def _count_commits(repo: Repo, include: bytes, exclude: bytes) -> int:
         except Exception:
             pass
         return 0
+
+
+def upstream_remote_name(upstream: str) -> str:
+    """从上游引用解析远程名：``refs/remotes/github/main`` → ``github``。
+
+    非远程上游（本地分支、空值）返回空串。
+    """
+    match = _UPSTREAM_REMOTE_RE.match(upstream or "")
+    return match.group(1) if match else ""
 
 
 def _upstream_ref(repo: Repo, branch: bytes) -> bytes | None:

@@ -1078,6 +1078,347 @@ def test_ui_layout(app: QApplication) -> None:
     window.close()
 
 
+def test_remote_multi(app: QApplication) -> None:
+    """远程列表多选：勾选多个远程后一次推送 / 批量删除。"""
+    print("\n== 远程多选：一次推送到多个远程 ==")
+    from PySide6.QtCore import Qt as _Qt
+
+    import gitdesk.ui.pages.repos as repos_module
+    from gitdesk.core.gitengine import GitEngine as Engine
+
+    repo = os.path.join(WORK, "multi-remote")
+    git("init", "--initial-branch=main", repo)
+    git("config", "user.name", "Tester", cwd=repo)
+    git("config", "user.email", "tester@example.com", cwd=repo)
+    with open(os.path.join(repo, "a.txt"), "w", encoding="utf-8") as fh:
+        fh.write("a\n")
+    git("add", "-A", cwd=repo)
+    git("commit", "-m", "init", cwd=repo)
+    git("remote", "add", "origin", "https://gitee.com/me/multi-remote.git", cwd=repo)
+    git("remote", "add", "github", "https://github.com/me/multi-remote.git", cwd=repo)
+
+    window = MainWindow()
+    window.resize(1400, 900)
+    window.show()
+    app.processEvents()
+    window.goto_key("repos")
+    window.repos_page._register_path(repo)
+
+    detail = window.repos_page.detail
+    deadline = time.time() + 25
+    while time.time() < deadline:
+        app.processEvents()
+        if detail.remote_list.rowCount() >= 2 and (detail._status or {}).get("branch"):
+            break
+        time.sleep(0.02)
+    app.processEvents()
+
+    def row_marks() -> list[bool]:
+        return [
+            detail.remote_list.item(r, 0).checkState() == _Qt.Checked
+            for r in range(detail.remote_list.rowCount())
+        ]
+
+    check("远程列表新增勾选列", detail.remote_list.columnCount() == 3,
+          str(detail.remote_list.columnCount()))
+    check("远程列表行数正确", detail.remote_list.rowCount() == 2,
+          str(detail.remote_list.rowCount()))
+    check("名称与地址列仍可读",
+          detail.remote_list.item(1, 1).text() == "github"
+          and detail.remote_list.item(1, 2).text().endswith("multi-remote.git"),
+          f"{detail.remote_list.item(1, 1).text()} / {detail.remote_list.item(1, 2).text()}")
+    check("默认勾选全部远程", row_marks() == [True, True], str(row_marks()))
+    check("已选数量提示正确", "已勾选 2 / 2" in detail.remote_sel_hint.text(),
+          detail.remote_sel_hint.text())
+    check("全选按钮初始为选中态", detail.btn_remote_all.isChecked())
+    check("新增「推送到选中远程」按钮",
+          detail.btn_remote_push.text() == "推送到选中远程")
+
+    # ---- 单独取消一个勾选 ----
+    detail.remote_list.item(0, 0).setCheckState(_Qt.Unchecked)
+    app.processEvents()
+    check("取消单个勾选后数量同步", detail._checked_remotes() == ["github"],
+          str(detail._checked_remotes()))
+    check("数量提示随勾选变化", "已勾选 1 / 2" in detail.remote_sel_hint.text(),
+          detail.remote_sel_hint.text())
+    check("部分勾选时全选按钮不亮", not detail.btn_remote_all.isChecked())
+
+    # ---- 全选 / 全不选 ----
+    detail.btn_remote_all.click()
+    app.processEvents()
+    check("全选按钮可一键勾选全部", detail._checked_remotes() == ["origin", "github"],
+          str(detail._checked_remotes()))
+    detail.btn_remote_all.click()
+    app.processEvents()
+    check("再次点击可取消全部勾选", detail._checked_remotes() == [],
+          str(detail._checked_remotes()))
+
+    # ---- 未勾选时给出提示而不是静默 ----
+    notices: list[tuple] = []
+    detail.notify.connect(lambda message, level="info": notices.append((message, level)))
+    detail.do_push_selected()
+    app.processEvents()
+    check("未勾选时提示先勾选远程",
+          any("请先勾选" in m for m, _ in notices), str(notices[-1:]))
+    check("未勾选时不启动推送任务", detail._upload_task is None)
+
+    # ---- 多选推送：一次推送到两个远程 ----
+    calls: list[dict] = []
+    fail_on: list[str] = []
+    original_push = Engine.push
+
+    def fake_push(path, remote, branch, **kwargs):
+        calls.append(
+            {
+                "remote": remote,
+                "branch": branch,
+                "platform": kwargs.get("platform"),
+                "set_upstream": kwargs.get("set_upstream"),
+            }
+        )
+        if fail_on and remote == fail_on[0]:
+            raise GitError("模拟推送失败：远端拒绝认证")
+        return {"branch": branch}
+
+    original_confirm = repos_module.confirm
+    original_show_error = repos_module.show_error
+    cfg_obj = detail.cfg
+    original_token, original_username = cfg_obj.token, cfg_obj.username
+    errors: list[tuple] = []
+    Engine.push = staticmethod(fake_push)
+    repos_module.confirm = lambda *a, **k: True
+    repos_module.show_error = lambda *a, **k: errors.append(a)
+    cfg_obj.token = lambda platform: "test-token"
+    cfg_obj.username = lambda platform: "tester"
+    try:
+        detail.btn_remote_all.click()   # 全选
+        app.processEvents()
+        check("勾选多个远程后可批量推送", detail._checked_remotes() == ["origin", "github"],
+              str(detail._checked_remotes()))
+        detail.do_push_selected()
+        deadline = time.time() + 25
+        while time.time() < deadline:
+            app.processEvents()
+            if len(calls) >= 2 and detail._upload_task is None:
+                break
+            time.sleep(0.02)
+        app.processEvents()
+        check("推送按勾选顺序逐个执行",
+              [c["remote"] for c in calls] == ["origin", "github"], str(calls))
+        check("按远程地址自动匹配平台",
+              [c["platform"] for c in calls] == ["gitee", "github"], str(calls))
+        check("从未建立上游时多选推送不改写上游",
+              [c["set_upstream"] for c in calls] == [False, False], str(calls))
+        check("多远程推送完成后提示数量",
+              any("已推送到 2 个远程" in m for m, _ in notices), str(notices[-2:]))
+        check("多远程推送不使用单远程文案",
+              not any(m == "推送成功，本地与远程已同步。" for m, _ in notices))
+
+        # ---- 部分成功：第二个远程失败时给出可读提示 ----
+        calls.clear()
+        notices.clear()
+        fail_on.append("github")
+        detail.do_push_selected()
+        deadline = time.time() + 25
+        while time.time() < deadline:
+            app.processEvents()
+            if errors and detail._upload_task is None:
+                break
+            time.sleep(0.02)
+        app.processEvents()
+        failed_message = errors[-1][2] if errors else ""
+        check("部分成功时说明已推送的远程",
+              "已成功推送到 origin" in failed_message and "推送到 github 失败" in failed_message,
+              failed_message[:120])
+        check("失败后停止继续推送后续远程", len(calls) == 2, str(len(calls)))
+        check("失败后错误面板可用",
+              detail.transfer.bar.property("state") == "error",
+              str(detail.transfer.bar.property("state")))
+        fail_on.clear()
+
+        # ---- 勾选状态在刷新后保留 ----
+        detail.remote_list.item(0, 0).setCheckState(_Qt.Checked)
+        detail.remote_list.item(1, 0).setCheckState(_Qt.Checked)
+        app.processEvents()
+        detail.remote_list.item(1, 0).setCheckState(_Qt.Unchecked)
+        app.processEvents()
+        detail.refresh_remotes()
+        deadline = time.time() + 25
+        while time.time() < deadline:
+            app.processEvents()
+            if detail.remote_list.item(1, 0) is not None and detail.remote_list.rowCount() == 2:
+                break
+            time.sleep(0.02)
+        app.processEvents()
+        check("刷新远程列表后保留勾选",
+              detail._checked_remotes() == ["origin"], str(detail._checked_remotes()))
+
+        # ---- 批量删除勾选的远程 ----
+        removed: list[str] = []
+        original_remove = Engine.remove_remote
+        Engine.remove_remote = staticmethod(lambda path, name: removed.append(name))
+        try:
+            detail.remote_list.item(1, 0).setCheckState(_Qt.Checked)
+            app.processEvents()
+            check("批量删除前已勾选两个远程",
+                  detail._checked_remotes() == ["origin", "github"],
+                  str(detail._checked_remotes()))
+            detail._remove_remote()
+            deadline = time.time() + 25
+            while time.time() < deadline:
+                app.processEvents()
+                if any("已删除 2 个远程" in m for m, _ in notices):
+                    break
+                time.sleep(0.02)
+            app.processEvents()
+            check("删除远程会处理全部勾选项",
+                  removed == ["origin", "github"], str(removed))
+            check("批量删除后提示数量",
+                  any("已删除 2 个远程" in m for m, _ in notices), str(notices[-3:]))
+        finally:
+            Engine.remove_remote = original_remove
+    finally:
+        Engine.push = original_push
+        repos_module.confirm = original_confirm
+        repos_module.show_error = original_show_error
+        cfg_obj.token = original_token
+        cfg_obj.username = original_username
+
+    detail.transfer.reset()
+    window.close()
+    app.processEvents()
+
+
+def test_sync_target(app: QApplication) -> None:
+    """同步操作以当前分支的上游远程为准，徽标点名是哪个远程。"""
+    print("\n== 同步目标与徽标 ==")
+    from gitdesk.core.gitengine import SyncState
+    from gitdesk.core.gitengine import upstream_remote_name
+
+    check("上游引用解析出远程名",
+          upstream_remote_name("refs/remotes/github/main") == "github",
+          upstream_remote_name("refs/remotes/github/main"))
+    check("非远程上游不解析远程名",
+          upstream_remote_name("refs/heads/main") == ""
+          and upstream_remote_name("") == ""
+          and upstream_remote_name(None) == "")
+    check("SyncState 暴露上游远程名",
+          SyncState(has_upstream=True, upstream="refs/remotes/origin/main").remote_name
+          == "origin")
+
+    repo = os.path.join(WORK, "sync-target")
+    git("init", "--initial-branch=main", repo)
+    git("config", "user.name", "Tester", cwd=repo)
+    git("config", "user.email", "tester@example.com", cwd=repo)
+    with open(os.path.join(repo, "a.txt"), "w", encoding="utf-8") as fh:
+        fh.write("a\n")
+    git("add", "-A", cwd=repo)
+    git("commit", "-m", "init", cwd=repo)
+    git("remote", "add", "origin", "https://gitee.com/me/sync-target.git", cwd=repo)
+    git("remote", "add", "github", "https://github.com/me/sync-target.git", cwd=repo)
+    git("config", "branch.main.remote", "github", cwd=repo)
+    git("config", "branch.main.merge", "refs/heads/main", cwd=repo)
+
+    window = MainWindow()
+    window.resize(1400, 900)
+    window.show()
+    app.processEvents()
+    window.goto_key("repos")
+    window.repos_page._register_path(repo)
+    deadline = time.time() + 25
+    while time.time() < deadline:
+        app.processEvents()
+        current = window.repos_page.detail
+        sync_now = current._sync or SyncState()
+        if current.remote_list.rowCount() >= 2 and sync_now.remote_name == "github":
+            break
+        time.sleep(0.02)
+    app.processEvents()
+
+    detail = window.repos_page.detail
+    target = detail._sync_remote() or {}
+    check("同步目标跟随上游远程", target.get("name") == "github", str(target))
+
+    # 徽标要点名是哪个远程（避免多远程时把「与远程一致」误读成「全都一致」）
+    detail._sync = SyncState(has_upstream=True, upstream="refs/remotes/github/main")
+    detail._render_overview()
+    check("一致时徽标点名远程", detail.sync_badge.text() == "与 github 一致",
+          detail.sync_badge.text())
+
+    detail._sync = SyncState(ahead=2, has_upstream=True, upstream="refs/remotes/github/main")
+    detail._render_overview()
+    check("领先时徽标点名远程", detail.sync_badge.text() == "领先 github 2",
+          detail.sync_badge.text())
+
+    detail._sync = SyncState(behind=3, has_upstream=True, upstream="refs/remotes/github/main")
+    detail._render_overview()
+    check("落后时徽标点名远程", detail.sync_badge.text() == "落后 github 3",
+          detail.sync_badge.text())
+
+    detail._sync = SyncState(ahead=1, behind=1, has_upstream=True,
+                             upstream="refs/remotes/github/main")
+    detail._render_overview()
+    check("分叉时徽标点名远程", detail.sync_badge.text() == "与 github 已分叉",
+          detail.sync_badge.text())
+
+    detail._sync = SyncState(has_upstream=True, upstream="refs/heads/main")
+    detail._render_overview()
+    check("上游非远程时回退通用文案", detail.sync_badge.text() == "与上游一致",
+          detail.sync_badge.text())
+
+    # 概览提示要说明这组按钮作用于哪个远程
+    detail._sync = SyncState(has_upstream=True, upstream="refs/remotes/github/main")
+    detail._render_overview()
+    check("概览提示写明同步目标", "「github」" in detail.ov_hint.text(),
+          detail.ov_hint.text()[:60])
+
+    # 「推送本地提交」应推到上游远程，且不改写上游配置
+    calls: list[dict] = []
+    from gitdesk.core.gitengine import GitEngine as Engine
+
+    original_push = Engine.push
+    import gitdesk.ui.pages.repos as repos_module
+
+    original_show_error = repos_module.show_error
+    original_token = detail.cfg.token
+    Engine.push = staticmethod(
+        lambda path, remote, branch, **kwargs: calls.append(
+            {"remote": remote, "set_upstream": kwargs.get("set_upstream"), "branch": branch}
+        ) or {"branch": branch}
+    )
+    repos_module.show_error = lambda *a, **k: None
+    detail.cfg.token = lambda platform: "test-token"
+    try:
+        detail._sync = SyncState(has_upstream=True, upstream="refs/remotes/github/main")
+        detail.do_push()
+        deadline = time.time() + 25
+        while time.time() < deadline:
+            app.processEvents()
+            if calls and detail._upload_task is None:
+                break
+            time.sleep(0.02)
+        app.processEvents()
+        check("推送本地提交推向上游远程",
+              [c["remote"] for c in calls] == ["github"], str(calls))
+        check("推送到上游远程时不改写上游配置",
+              calls and calls[0]["set_upstream"] is False, str(calls))
+
+        # 上游不在远程列表中时，同步操作退回 origin
+        git("config", "--unset", "branch.main.remote", cwd=repo)
+        remotes = [r for r in Engine.remotes(repo)]
+        detail._sync = SyncState()
+        fallback = detail._sync_remote() or {}
+        check("无上游时同步目标退回 origin", fallback.get("name") == "origin",
+              f"{fallback} / {remotes}")
+    finally:
+        Engine.push = original_push
+        repos_module.show_error = original_show_error
+        detail.cfg.token = original_token
+
+    window.close()
+    app.processEvents()
+
+
 def test_live(app: QApplication) -> None:
     """联网用例：仅在 GITDESK_LIVE=1 时执行。"""
     if os.environ.get("GITDESK_LIVE") != "1":
@@ -1107,6 +1448,8 @@ def main() -> int:
     test_structure_tree()
     test_ui(app)
     test_ui_layout(app)
+    test_remote_multi(app)
+    test_sync_target(app)
     test_live(app)
     print("\n" + "=" * 60)
     print(f"通过 {len(PASS)} 项，失败 {len(FAIL)} 项")

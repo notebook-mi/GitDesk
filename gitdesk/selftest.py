@@ -687,6 +687,87 @@ def run_self_test(report_path: str | None = None) -> int:
                 "失败后停止/关闭按钮仍可用",
                 detail.transfer.stop_btn.isEnabled() and not detail.transfer.stop_btn.isHidden(),
             )
+
+            # 远程列表多选：勾选多个远程一次推送（此处只验证状态机，不触发真实推送）
+            from PySide6.QtCore import Qt as _Qt
+
+            detail._render_remotes(
+                [
+                    {"name": "origin", "url": "https://gitee.com/u/r.git"},
+                    {"name": "github", "url": "https://github.com/u/r.git"},
+                ]
+            )
+            _record(
+                "远程列表新增勾选列",
+                detail.remote_list.columnCount() == 3,
+                str(detail.remote_list.columnCount()),
+            )
+            _record(
+                "远程列表默认全选",
+                detail._checked_remotes() == ["origin", "github"],
+                str(detail._checked_remotes()),
+            )
+            detail.remote_list.item(0, 0).setCheckState(_Qt.Unchecked)
+            _record(
+                "取消勾选后数量同步",
+                detail._checked_remotes() == ["github"],
+                str(detail._checked_remotes()),
+            )
+            _record(
+                "已选数量提示可读",
+                "已勾选 1 / 2" in detail.remote_sel_hint.text(),
+                detail.remote_sel_hint.text(),
+            )
+            detail.btn_remote_all.click()
+            _record(
+                "全选按钮可一键勾选全部",
+                len(detail._checked_remotes()) == 2,
+                str(detail._checked_remotes()),
+            )
+            _record(
+                "新增「推送到选中远程」按钮",
+                detail.btn_remote_push.text() == "推送到选中远程",
+                detail.btn_remote_push.text(),
+            )
+            detail.btn_remote_all.click()          # 全部取消
+            detail.path = os.path.join(work, "multi")
+            detail.do_push_selected()
+            _record(
+                "未勾选远程时不启动推送任务",
+                detail._upload_task is None,
+                str(detail._upload_task),
+            )
+            detail.path = ""
+
+            # 同步徽标要点名「跟哪个远程比」（多远程时避免误读成「全都一致」）
+            from .core.gitengine import SyncState as _SyncState
+
+            _record(
+                "上游引用可解析出远程名",
+                engine.upstream_remote_name("refs/remotes/github/main") == "github",
+                engine.upstream_remote_name("refs/remotes/github/main"),
+            )
+            _record(
+                "非远程上游不解析远程名",
+                engine.upstream_remote_name("refs/heads/main") == ""
+                and engine.upstream_remote_name("") == "",
+            )
+            detail._sync = _SyncState(has_upstream=True, upstream="refs/remotes/github/main")
+            detail._render_overview()
+            _record(
+                "一致时徽标点名上游远程",
+                detail.sync_badge.text() == "与 github 一致",
+                detail.sync_badge.text(),
+            )
+            detail._sync = _SyncState(
+                behind=2, has_upstream=True, upstream="refs/remotes/origin/main"
+            )
+            detail._render_overview()
+            _record(
+                "落后时徽标点名上游远程",
+                detail.sync_badge.text() == "落后 origin 2",
+                detail.sync_badge.text(),
+            )
         except Exception as exc:  # noqa: BLE001
             _record("概览页滚动容器与失败态", False, f"{type(exc).__name__}: {exc}")
     except Exception as exc:  # noqa: BLE001

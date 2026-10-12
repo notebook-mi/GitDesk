@@ -39,7 +39,14 @@ from PySide6.QtWidgets import (
 
 from ...core import platapi
 from ...core.config import RepoStore, _now
-from ...core.gitengine import STAGED_LABELS, Credential, GitEngine, GitError, SyncState
+from ...core.gitengine import (
+    STAGED_LABELS,
+    CancelledError,
+    Credential,
+    GitEngine,
+    GitError,
+    SyncState,
+)
 from ...core.logger import get_logger
 from ...core.publish import PublishPlan, publish_local
 from ...core.tree import filter_tree, format_size, list_dir, summarize
@@ -87,6 +94,9 @@ class RepoDetailPanel(QWidget):
         self._upload_task = None      # 正在运行的上传任务（推送 / 发布），供「停止」使用
         self._struct_loading = False
         self._struct_options: dict = {}
+        self._remote_checked: set[str] | None = None  # 勾选的远程；None = 首次渲染（默认全选）
+        self._remote_path = ""                        # 上次渲染远程列表时的仓库路径
+        self._remote_rendering = False                # 渲染期间屏蔽 itemChanged 回写
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -229,10 +239,7 @@ class RepoDetailPanel(QWidget):
         row2.addStretch(1)
         actions.add_layout(row2)
 
-        self.ov_hint = QLabel(
-            "「发布到远程仓库」可一键在 GitHub / Gitee 上创建仓库并推送本地内容；"
-            "拉取前会自动检查工作区，存在未提交更改时会阻止操作，避免代码丢失。"
-        )
+        self.ov_hint = QLabel(self._hint_default())
         self.ov_hint.setObjectName("Faint")
         self.ov_hint.setWordWrap(True)
         actions.add(self.ov_hint)
@@ -415,6 +422,9 @@ class RepoDetailPanel(QWidget):
         self.btn_remote_publish = QPushButton("创建远程仓库并推送")
         self.btn_remote_publish.setProperty("variant", "primary")
         self.btn_remote_publish.clicked.connect(self.publish_to_remote)
+        self.btn_remote_push = QPushButton("推送到选中远程")
+        self.btn_remote_push.setToolTip("把当前分支一次推送到所有勾选的远程（可多选，如同时推 Gitee 与 GitHub）")
+        self.btn_remote_push.clicked.connect(self.do_push_selected)
         self.btn_remote_add = QPushButton("添加远程")
         self.btn_remote_add.clicked.connect(self._add_remote)
         self.btn_remote_edit = QPushButton("修改地址")
@@ -423,27 +433,44 @@ class RepoDetailPanel(QWidget):
         self.btn_remote_del.setProperty("variant", "danger")
         self.btn_remote_del.clicked.connect(self._remove_remote)
         bar.addWidget(self.btn_remote_publish)
+        bar.addWidget(self.btn_remote_push)
         bar.addWidget(self.btn_remote_add)
         bar.addWidget(self.btn_remote_edit)
         bar.addWidget(self.btn_remote_del)
         bar.addStretch(1)
+        self.remote_sel_hint = QLabel("未配置远程")
+        self.remote_sel_hint.setObjectName("Faint")
+        bar.addWidget(self.remote_sel_hint)
+        self.btn_remote_all = QPushButton("全选")
+        self.btn_remote_all.setObjectName("MiniButton")
+        self.btn_remote_all.setProperty("variant", "ghost")
+        self.btn_remote_all.setCheckable(True)
+        self.btn_remote_all.setChecked(True)
+        self.btn_remote_all.setCursor(Qt.PointingHandCursor)
+        self.btn_remote_all.setToolTip("一键勾选 / 取消勾选全部远程")
+        self.btn_remote_all.toggled.connect(self._toggle_all_remotes)
+        bar.addWidget(self.btn_remote_all)
         layout.addLayout(bar)
 
-        self.remote_list = QTableWidget(0, 2)
-        self.remote_list.setHorizontalHeaderLabels(["名称", "地址"])
+        self.remote_list = QTableWidget(0, 3)
+        self.remote_list.setHorizontalHeaderLabels(["", "名称", "地址"])
         self.remote_list.verticalHeader().setVisible(False)
         self.remote_list.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.remote_list.setSelectionMode(QAbstractItemView.SingleSelection)
         self.remote_list.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.remote_list.setShowGrid(False)
+        self.remote_list.itemChanged.connect(self._on_remote_item_changed)
         rh = self.remote_list.horizontalHeader()
-        rh.setSectionResizeMode(0, QHeaderView.ResizeToContents)
-        rh.setSectionResizeMode(1, QHeaderView.Stretch)
+        rh.setSectionResizeMode(0, QHeaderView.Fixed)
+        self.remote_list.setColumnWidth(0, 36)
+        rh.setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        rh.setSectionResizeMode(2, QHeaderView.Stretch)
         layout.addWidget(self.remote_list, 1)
 
         note = QLabel(
-            "提示：远程地址请使用 HTTPS 形式（如 https://github.com/用户名/仓库.git）。"
-            "GitDesk 会在同步时自动附加已配置的访问令牌，无需把令牌写进地址。"
+            "提示：勾选一个或多个远程后，点「推送到选中远程」可一次推送（如同时推 Gitee 与 GitHub）；"
+            "「删除远程」也会删除所有勾选项。远程地址请使用 HTTPS 形式"
+            "（如 https://github.com/用户名/仓库.git），GitDesk 会在同步时自动附加已配置的访问令牌。"
         )
         note.setObjectName("Faint")
         note.setWordWrap(True)
@@ -737,7 +764,11 @@ class RepoDetailPanel(QWidget):
         self.history_table.setRowCount(0)
         self.local_table.setRowCount(0)
         self.remote_table.setRowCount(0)
+        self._remote_rendering = True
         self.remote_list.setRowCount(0)
+        self._remote_rendering = False
+        self._remote_checked = None   # 换仓库后重新默认全选
+        self._sync_remote_selection()
         self.stash_list.setRowCount(0)
         if hasattr(self, "struct_tree"):
             self.struct_tree.clear()
@@ -803,11 +834,40 @@ class RepoDetailPanel(QWidget):
             )
             log.info("工作区发生变化，当前共 %d 个变更文件", count)
 
+    @staticmethod
+    def _hint_default() -> str:
+        return (
+            "「发布到远程仓库」可一键在 GitHub / Gitee 上创建仓库并推送本地内容；"
+            "拉取前会自动检查工作区，存在未提交更改时会阻止操作，避免代码丢失。"
+        )
+
+    def _hint_text(self, sync: SyncState) -> str:
+        """说明「同步操作」这一组按钮当前作用于哪个远程，避免多远程时误判。"""
+        base = self._hint_default()
+        target = self._sync_remote()
+        if target is None:
+            return base
+        name = target["name"]
+        if sync.has_upstream and sync.remote_name:
+            if sync.remote_name == name:
+                lead = f"获取 / 拉取 / 推送都作用于「{name}」（当前分支的跟踪远程）。"
+            else:
+                lead = (
+                    f"分支的上游「{sync.remote_name}」已不在远程列表中，"
+                    f"同步操作暂以「{name}」为目标。"
+                )
+        else:
+            lead = (
+                f"当前分支还没有上游跟踪，获取 / 拉取 / 推送先以「{name}」为目标，"
+                "推送成功后自动为它建立跟踪。"
+            )
+        return lead + base
+
     def _poll_remote(self) -> None:
         if not self.path or self._busy:
             return
         path = self.path
-        remote = self._primary_remote()
+        remote = self._sync_remote()
         if not remote:
             return
         branch = self._status.get("branch") or self._sync.upstream.rsplit("/", 1)[-1]
@@ -916,16 +976,30 @@ class RepoDetailPanel(QWidget):
             self.ov_labels["dirty"].setStyleSheet("color:#9a6700;")
         self.ov_labels["file_count"].setText(str(self._commit_count()))
 
+        # 徽标只反映当前分支与**它的上游远程**之间的关系，因此文案里点明是哪个远程，
+        # 避免多远程（如同时在 Gitee + GitHub）时被理解成「与所有远程一致」。
+        remote = sync.remote_name
+        if remote:
+            tag_diverged = f"与 {remote} 已分叉"
+            tag_ahead = f"领先 {remote} {sync.ahead}"
+            tag_behind = f"落后 {remote} {sync.behind}"
+            tag_same = f"与 {remote} 一致"
+        else:
+            tag_diverged = "已分叉"
+            tag_ahead = f"领先 {sync.ahead}"
+            tag_behind = f"落后 {sync.behind}"
+            tag_same = "与上游一致"
         if sync.diverged:
-            self.sync_badge.set_state("已分叉", "#b42318")
+            self.sync_badge.set_state(tag_diverged, "#b42318")
         elif sync.ahead and not sync.behind:
-            self.sync_badge.set_state(f"领先 {sync.ahead}", "#9a6700")
+            self.sync_badge.set_state(tag_ahead, "#9a6700")
         elif sync.behind and not sync.ahead:
-            self.sync_badge.set_state(f"落后 {sync.behind}", "#2d6cdf")
+            self.sync_badge.set_state(tag_behind, "#2d6cdf")
         elif sync.has_upstream:
-            self.sync_badge.set_state("与远程一致", "#1a7f37")
+            self.sync_badge.set_state(tag_same, "#1a7f37")
         else:
             self.sync_badge.set_state("无跟踪分支", "#656d76")
+        self.ov_hint.setText(self._hint_text(sync))
 
     def _check_notice(self) -> None:
         messages: list[tuple[str, str]] = []
@@ -948,7 +1022,10 @@ class RepoDetailPanel(QWidget):
                 )
             )
         if self._remote_advanced:
-            messages.append(("info", "远程仓库出现了新的提交，建议点击「拉取并合并」同步。"))
+            remote_name = (self._sync.remote_name if self._sync else "") or "远程"
+            messages.append(
+                ("info", f"「{remote_name}」上出现了新的提交，建议点击「拉取并合并」同步。")
+            )
         if not self._primary_remote():
             messages.append(
                 (
@@ -1087,14 +1164,78 @@ class RepoDetailPanel(QWidget):
         )
 
     def _render_remotes(self, remotes: list[dict]) -> None:
-        self.remote_list.setRowCount(len(remotes))
-        for row, remote in enumerate(remotes):
-            self.remote_list.setItem(row, 0, QTableWidgetItem(remote["name"]))
-            url_item = QTableWidgetItem(remote["url"])
-            url_item.setToolTip(remote["url"])
-            self.remote_list.setItem(row, 1, url_item)
-        self.remote_list.resizeRowsToContents()
+        names = [r["name"] for r in remotes]
+        # 首次渲染 / 切换仓库后默认全选；同仓库内刷新则保留用户勾选
+        if self._remote_checked is None or self._remote_path != self.path:
+            checked = set(names)
+        else:
+            checked = {n for n in self._remote_checked if n in names}
+        self._remote_rendering = True
+        try:
+            self.remote_list.setRowCount(len(remotes))
+            for row, remote in enumerate(remotes):
+                mark = QTableWidgetItem("")
+                mark.setFlags(
+                    Qt.ItemIsEnabled | Qt.ItemIsSelectable | Qt.ItemIsUserCheckable
+                )
+                mark.setCheckState(Qt.Checked if remote["name"] in checked else Qt.Unchecked)
+                mark.setTextAlignment(Qt.AlignCenter)
+                mark.setToolTip("勾选后可一次推送到多个远程")
+                self.remote_list.setItem(row, 0, mark)
+                self.remote_list.setItem(row, 1, QTableWidgetItem(remote["name"]))
+                url_item = QTableWidgetItem(remote["url"])
+                url_item.setToolTip(remote["url"])
+                self.remote_list.setItem(row, 2, url_item)
+            self.remote_list.resizeRowsToContents()
+        finally:
+            self._remote_rendering = False
+        self._remote_checked = set(checked) if names else None
+        self._remote_path = self.path
+        self._sync_remote_selection()
         self._render_overview()
+
+    # ---------------- 远程勾选 ----------------
+
+    def _checked_remotes(self) -> list[str]:
+        """当前勾选的远程名称（保持列表顺序）。"""
+        picked: list[str] = []
+        for row in range(self.remote_list.rowCount()):
+            mark = self.remote_list.item(row, 0)
+            name = self.remote_list.item(row, 1)
+            if mark is not None and mark.checkState() == Qt.Checked and name is not None:
+                picked.append(name.text())
+        return picked
+
+    def _sync_remote_selection(self) -> None:
+        """刷新「已勾选 N / M」提示与全选按钮状态。"""
+        total = self.remote_list.rowCount()
+        picked = self._checked_remotes()
+        if total == 0:
+            self.remote_sel_hint.setText("未配置远程")
+        else:
+            self.remote_sel_hint.setText(f"已勾选 {len(picked)} / {total} 个远程")
+        self.btn_remote_all.blockSignals(True)
+        self.btn_remote_all.setChecked(total > 0 and len(picked) == total)
+        self.btn_remote_all.blockSignals(False)
+        self.btn_remote_all.setEnabled(total > 0)
+
+    def _on_remote_item_changed(self, item: QTableWidgetItem) -> None:
+        if self._remote_rendering or item.column() != 0:
+            return
+        self._remote_checked = set(self._checked_remotes())
+        self._sync_remote_selection()
+
+    def _toggle_all_remotes(self, checked: bool) -> None:
+        self._remote_rendering = True
+        try:
+            for row in range(self.remote_list.rowCount()):
+                mark = self.remote_list.item(row, 0)
+                if mark is not None:
+                    mark.setCheckState(Qt.Checked if checked else Qt.Unchecked)
+        finally:
+            self._remote_rendering = False
+        self._remote_checked = set(self._checked_remotes())
+        self._sync_remote_selection()
 
     def refresh_stash(self) -> None:
         if not self.path:
@@ -1147,7 +1288,7 @@ class RepoDetailPanel(QWidget):
             self.btn_stash, self.btn_commit, self.btn_stage_all, self.btn_stage_sel,
             self.btn_unstage, self.btn_discard, self.btn_branch_switch,
             self.btn_branch_new, self.btn_branch_del,
-            self.btn_publish, self.btn_remote_publish,
+            self.btn_publish, self.btn_remote_publish, self.btn_remote_push,
         ):
             btn.setEnabled(not busy)
         if message and busy:
@@ -1204,8 +1345,27 @@ class RepoDetailPanel(QWidget):
         record = self.store.get(self.path) or {}
         return record.get("platform") or "github"
 
+    def _sync_remote(self) -> dict | None:
+        """同步操作（获取 / 拉取 / 推送）的目标远程。
+
+        优先用**当前分支的跟踪远程**（与概览徽标「与 xxx 一致」同源），
+        没有上游时退回 ``origin``，再退回第一个远程。
+        """
+        remotes = GitEngine.remotes(self.path) if self.path else []
+        if not remotes:
+            return None
+        name = self._sync.remote_name if self._sync else ""
+        if name:
+            for remote in remotes:
+                if remote["name"] == name:
+                    return remote
+        for remote in remotes:
+            if remote["name"] == "origin":
+                return remote
+        return remotes[0]
+
     def _credential(self) -> tuple[Credential, str, dict | None]:
-        remote = self._primary_remote()
+        remote = self._sync_remote()
         if not remote:
             return Credential(), "github", None
         platform = self._guess_platform(remote["url"])
@@ -1661,6 +1821,9 @@ class RepoDetailPanel(QWidget):
             show_error(self, "无法推送", "当前仓库处于游离 HEAD 状态，请先切换到具体分支。")
             return
         path = self.path
+        # 目标就是当前上游远程时不要改写上游配置；换成别的远程才重新建立跟踪
+        upstream_name = self._sync.remote_name if self._sync else ""
+        set_upstream = remote["name"] != upstream_name
 
         def job(progress=None, detail=None, cancel=None):
             GitEngine.push(
@@ -1671,13 +1834,13 @@ class RepoDetailPanel(QWidget):
                 platform=platform,
                 progress=progress,
                 detail=detail,
-                set_upstream=True,
+                set_upstream=set_upstream,
                 cancel=cancel,
             )
-            return GitEngine.sync_state(path)
+            return {"sync": GitEngine.sync_state(path), "pushed": [remote["name"]]}
 
         self._set_busy(
-            True, f"正在推送分支 {branch}…", indeterminate=True,
+            True, f"正在推送到 {remote['name']}（分支 {branch}）…", indeterminate=True,
             kind="上传 · 推送", cancellable=True,
         )
         self._upload_task = self.tasks.run(
@@ -1690,12 +1853,121 @@ class RepoDetailPanel(QWidget):
             label="推送本地提交",
         )
 
-    def _on_push_done(self, sync) -> None:
+    def do_push_selected(self) -> None:
+        """把当前分支一次推送到所有勾选的远程（支持多选）。"""
+        if not self.path:
+            return
+        names = self._checked_remotes()
+        if not names:
+            self.notify.emit("请先勾选要推送的远程仓库（可勾选多个）。", "info")
+            return
+        branch = (self._status or {}).get("branch") or ""
+        if not branch:
+            show_error(self, "无法推送", "当前仓库处于游离 HEAD 状态，请先切换到具体分支。")
+            return
+
+        known = {r["name"]: r for r in GitEngine.remotes(self.path)}
+        targets: list[dict] = []
+        missing: list[str] = []
+        for name in names:
+            remote = known.get(name)
+            if not remote:
+                continue
+            platform = self._guess_platform(remote["url"])
+            token = self.cfg.token(platform)
+            if not token:
+                label = platapi.PLATFORMS.get(platform, platapi.PLATFORMS["github"]).label
+                if label not in missing:
+                    missing.append(label)
+                continue
+            targets.append(
+                {
+                    "name": name,
+                    "platform": platform,
+                    "credential": Credential(self.cfg.username(platform), token),
+                }
+            )
+        if missing:
+            show_error(
+                self,
+                "缺少访问令牌",
+                "以下平台尚未配置访问令牌：" + "、".join(missing) +
+                "\n\n请先到「账号设置」完成配置后再推送。",
+            )
+            return
+        if not targets:
+            self.notify.emit("勾选的远程已不存在，请刷新后重试。", "info")
+            return
+
+        path = self.path
+        total = len(targets)
+        picked_names = [t["name"] for t in targets]
+        # 不擅自改写上游：已有上游且本次推送到它 → 保持跟踪；从未建立上游且只推一个 → 建立
+        has_upstream = bool(self._sync and self._sync.has_upstream)
+        upstream_name = self._sync.remote_name if self._sync else ""
+        if has_upstream:
+            upstream = upstream_name if upstream_name in picked_names else ""
+        else:
+            upstream = picked_names[0] if total == 1 else ""
+
+        def job(progress=None, detail=None, cancel=None):
+            done: list[str] = []
+            for index, target in enumerate(targets, 1):
+                if progress:
+                    progress(
+                        f"[{index}/{total}] 正在推送到 {target['name']}"
+                        f"（{target['platform']}）…"
+                    )
+                try:
+                    GitEngine.push(
+                        path,
+                        target["name"],
+                        branch,
+                        credential=target["credential"],
+                        platform=target["platform"],
+                        progress=progress,
+                        detail=detail,
+                        set_upstream=(target["name"] == upstream),
+                        cancel=cancel,
+                    )
+                except CancelledError:
+                    raise
+                except GitError as exc:
+                    prefix = f"已成功推送到 {'、'.join(done)}；" if done else ""
+                    raise GitError(
+                        f"{prefix}推送到 {target['name']} 失败：{exc.message}", exc.detail
+                    ) from exc
+                done.append(target["name"])
+            return {"sync": GitEngine.sync_state(path), "pushed": done}
+
+        joined = "、".join(picked_names)
+        self._set_busy(
+            True,
+            f"正在推送到 {total} 个远程（{joined}）…",
+            indeterminate=True, kind="上传 · 推送", cancellable=True,
+        )
+        log.info("推送分支 %s 到 %d 个远程: %s", branch, total, picked_names)
+        self._upload_task = self.tasks.run(
+            job,
+            on_progress=self._progress_to_panel,
+            on_detail=self._on_detail,
+            on_success=self._on_push_done,
+            on_error=self._on_action_error,
+            on_cancelled=self._on_upload_stopped,
+            label="推送本地提交",
+        )
+
+    def _on_push_done(self, payload) -> None:
         self._upload_task = None
-        self.transfer.finish("推送成功，本地与远程已同步", ok=True)
+        pushed = payload.get("pushed") if isinstance(payload, dict) else None
+        if pushed and len(pushed) > 1:
+            message = f"已推送到 {len(pushed)} 个远程：{'、'.join(pushed)}"
+        else:
+            message = "推送成功，本地与远程已同步"
+        self.transfer.finish(message, ok=True)
         self._set_busy(False)
-        self.notify.emit("推送成功，本地与远程已同步。", "success")
-        log.info("推送成功")
+        self.notify.emit(f"{message}。", "success")
+        log.info("推送成功：%s", message)
         self.refresh_all()
         self.changed.emit()
 
@@ -1930,8 +2202,13 @@ class RepoDetailPanel(QWidget):
         if row < 0 or not self.path:
             self.notify.emit("请先选择要修改的远程。", "info")
             return
-        name = self.remote_list.item(row, 0).text()
-        old_url = self.remote_list.item(row, 1).text()
+        name_item = self.remote_list.item(row, 1)
+        url_item = self.remote_list.item(row, 2)
+        if name_item is None or url_item is None:
+            self.notify.emit("请先选择要修改的远程。", "info")
+            return
+        name = name_item.text()
+        old_url = url_item.text()
         url, ok = QInputDialog.getText(self, "修改远程地址", f"{name} 的地址：", text=old_url)
         if not ok or not url.strip():
             return
@@ -1943,15 +2220,40 @@ class RepoDetailPanel(QWidget):
         )
 
     def _remove_remote(self) -> None:
-        row = self.remote_list.currentRow()
-        if row < 0 or not self.path:
-            self.notify.emit("请先选择要删除的远程。", "info")
+        if not self.path:
             return
-        name = self.remote_list.item(row, 0).text()
-        if not confirm(self, "删除远程", f"确定删除远程 {name} 吗？", danger=True):
+        names = self._checked_remotes()
+        if not names:
+            row = self.remote_list.currentRow()
+            if row < 0:
+                self.notify.emit("请先勾选或选中要删除的远程。", "info")
+                return
+            item = self.remote_list.item(row, 1)
+            if item is None:
+                self.notify.emit("请先勾选或选中要删除的远程。", "info")
+                return
+            names = [item.text()]
+        if len(names) > 1:
+            body = f"确定删除这 {len(names)} 个远程吗？\n\n" + "\n".join(f"· {n}" for n in names)
+            message = f"已删除 {len(names)} 个远程"
+        else:
+            body = f"确定删除远程 {names[0]} 吗？"
+            message = f"已删除远程 {names[0]}"
+        if not confirm(
+            self, "删除远程",
+            body + "\n\n删除后本地分支与提交不受影响，但推送前需重新配置远程。",
+            danger=True,
+        ):
             return
         path = self.path
-        self._run_simple(lambda: GitEngine.remove_remote(path, name), f"已删除远程 {name}", "删除远程")
+        targets = list(names)
+
+        def job():
+            for name in targets:
+                GitEngine.remove_remote(path, name)
+            return len(targets)
+
+        self._run_simple(job, message, "删除远程")
 
     # ===================================================================== #
     # 暂存区
@@ -2031,6 +2333,7 @@ class RepoDetailPanel(QWidget):
         self.changed.emit()
 
     def _on_action_error(self, message: str, detail: str) -> None:
+        self._upload_task = None
         self.transfer.finish(elide(message, 60), ok=False)
         self._set_busy(False)
         self.notify.emit(elide(message, 90), "error")

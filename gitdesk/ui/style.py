@@ -75,6 +75,11 @@ QPushButton[variant="ghost"] {
     background: transparent; border: 1px solid transparent; color: %(muted)s;
 }
 QPushButton[variant="ghost"]:hover { background: #eef1f5; color: %(text)s; }
+QPushButton[variant="ghost"]:checked {
+    background: %(primary_soft)s; border-color: %(primary_soft)s; color: %(primary_dark)s;
+    font-weight: 600;
+}
+QPushButton[variant="ghost"]:checked:hover { background: %(primary_soft)s; }
 
 QPushButton#NavButton {
     text-align: left;
