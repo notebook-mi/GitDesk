@@ -1,0 +1,6 @@
+PySide6>=6.8
+dulwich>=1.2
+merge3>=0.0.16
+requests>=2.31
+Pillow>=10.0
+pyinstaller>=6.10

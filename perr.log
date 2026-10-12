@@ -1,0 +1,13 @@
+counting objects: 3, done.
+found 0 deltas to reuse
+Push to file:C:\Users\32721\AppData\Local\Temp\gitdesk-publish-3ju0n1a8\remote1.git successful.
+counting objects: 4, done.
+found 0 deltas to reuse
+Push to file:C:\Users\32721\AppData\Local\Temp\gitdesk-publish-3ju0n1a8\remote2.git successful.
+counting objects: 3, done.
+found 0 deltas to reuse
+Push to file:C:\Users\32721\AppData\Local\Temp\gitdesk-publish-3ju0n1a8\remote4.git successful.
+counting objects: 3, done.
+found 0 deltas to reuse
+Push to file:C:\Users\32721\AppData\Local\Temp\gitdesk-publish-3ju0n1a8\remote5.git successful.
+任务异常[加载github仓库列表]: 身份验证失败：令牌无效或已过期，请重新生成访问令牌。
