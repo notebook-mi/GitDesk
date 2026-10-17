@@ -77,6 +77,12 @@ Windows 桌面端 GitHub/Gitee 仓库管理器，交付单文件绿色 exe，内
   ② 「本行圆点 → 下一行圆点」的连线必须指向本行父提交（禁止误指）。
   泳道分配时 `parents[1:]` 必须先查 `active` 里是否已有泳道在等该父（命中→merge 线、不新占泳道），
   共享祖先保留最左泳道作主线（`survivor = min(...)`）
+- **分支合并**：`GitEngine.merge_branch(path, source)` 的 `source` 支持 `x` / `origin/x` / `refs/...`，
+  由 `_resolve_merge_source()` 解析（本地优先）。快进优先，分叉才建合并提交；
+  冲突先 `merge_tree()` 只读预检，真合并出错用 `_abort_merge()` 回滚。
+  前置拦截三类：游离 HEAD、残留 `MERGE_HEAD`、工作区不干净。
+  UI 取选中分支时按**焦点**决定先读本地表还是远程表（两张表各有 currentRow，不能固定优先级）。
+  `porcelain.merge` 的 author/committer 是 bytes：`b"Name <email>"`
 - 主题：`ui/style.py::apply_light_theme()` 把应用锁定为浅色（`QStyleHints.setColorScheme(Light)`）。
   原因：`QScrollArea.setWidget()` 会打开子控件 autoFillBackground，深色系统主题下会自绘成黑底；
   凡是「按调色板自绘背景」的控件都必须显式指定浅色背景

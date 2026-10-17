@@ -240,6 +240,54 @@ def run_self_test(report_path: str | None = None) -> int:
         _record("冲突时中止并给出提示", caught is not None and "冲突" in str(caught), str(caught))
         _record("冲突时本地文件未被改动", before == after, f"{before!r} -> {after!r}")
 
+        # 8.1 分支合并（快进 / 冲突回滚）
+        merge_repo = os.path.join(work, "merge-demo")
+        GitEngine.init(merge_repo)
+        with open(os.path.join(merge_repo, "base.txt"), "w", encoding="utf-8") as fh:
+            fh.write("base\n")
+        GitEngine.stage(merge_repo, ["base.txt"])
+        GitEngine.commit(merge_repo, "初始提交", "SelfTest", "selftest@local")
+        GitEngine.create_branch(merge_repo, "feature")
+        with open(os.path.join(merge_repo, "feat.txt"), "w", encoding="utf-8") as fh:
+            fh.write("feat\n")
+        GitEngine.stage(merge_repo, ["feat.txt"])
+        GitEngine.commit(merge_repo, "分支提交", "SelfTest", "selftest@local")
+        GitEngine.checkout(merge_repo, "main")
+        merge_result = GitEngine.merge_branch(merge_repo, "feature")
+        _record(
+            "分支合并可快进",
+            merge_result.get("result") == "fast_forward",
+            str(merge_result),
+        )
+        _record(
+            "合并后工作区拿到目标分支的文件",
+            os.path.isfile(os.path.join(merge_repo, "feat.txt")),
+        )
+
+        GitEngine.create_branch(merge_repo, "conflict-side")
+        with open(os.path.join(merge_repo, "base.txt"), "w", encoding="utf-8") as fh:
+            fh.write("来自分支\n")
+        GitEngine.stage(merge_repo, ["base.txt"])
+        GitEngine.commit(merge_repo, "分支改同一文件", "SelfTest", "selftest@local")
+        GitEngine.checkout(merge_repo, "main")
+        with open(os.path.join(merge_repo, "base.txt"), "w", encoding="utf-8") as fh:
+            fh.write("来自主线\n")
+        GitEngine.stage(merge_repo, ["base.txt"])
+        GitEngine.commit(merge_repo, "主线改同一文件", "SelfTest", "selftest@local")
+        merge_before = open(os.path.join(merge_repo, "base.txt"), encoding="utf-8").read()
+        caught = None
+        try:
+            GitEngine.merge_branch(merge_repo, "conflict-side")
+        except GitError as exc:
+            caught = exc
+        merge_after = open(os.path.join(merge_repo, "base.txt"), encoding="utf-8").read()
+        _record(
+            "合并冲突被拦截",
+            caught is not None and "冲突" in str(caught),
+            str(caught),
+        )
+        _record("合并冲突后本地文件未被改动", merge_before == merge_after)
+
         # 9. 错误处理
         caught = None
         try:

@@ -1571,6 +1571,141 @@ class GitEngine:
             }
 
     @staticmethod
+    def merge_branch(
+        path: str,
+        source: str,
+        *,
+        no_ff: bool = False,
+        message: str | None = None,
+        author: str = "GitDesk",
+        email: str = "gitdesk@localhost",
+    ) -> dict:
+        """把 ``source`` 分支合并进**当前分支**。
+
+        ``source`` 可以是本地分支名（``feature/x``）、远程跟踪分支（``origin/main``）
+        或完整引用（``refs/heads/x`` / ``refs/remotes/origin/x``）。
+
+        行为对齐 git 默认语义：能快进就快进；否则创建合并提交。
+        合并前先做只读预检，一旦有冲突就中止（工作区与索引都不动）；
+        真合并过程中出错或产生冲突则自动回滚到操作前状态。
+
+        返回 ``result``：
+          - ``up_to_date``     两个引用已指向同一提交
+          - ``already_merged`` 源分支已完全包含在当前分支中
+          - ``fast_forward``   快进（``advanced`` 为前进的提交数）
+          - ``merged``         生成了合并提交（``commit``）
+        """
+        with _repo(path) as repo:
+            branch = porcelain.active_branch(repo)
+            if not branch:
+                raise GitError("当前处于游离 HEAD 状态，请先切换到具体分支后再合并。")
+
+            merge_head = os.path.join(repo.controldir(), "MERGE_HEAD")
+            if os.path.exists(merge_head):
+                raise GitError(
+                    "上一次合并尚未完成（存在未合并的冲突）。\n"
+                    "请先在命令行解决冲突并提交，或执行 git merge --abort 后再试。"
+                )
+
+            source_ref = _resolve_merge_source(repo, source)
+            if not source_ref:
+                raise GitError(
+                    f"找不到分支「{source}」。\n请刷新分支列表后重试，"
+                    "远程分支需先「拉取远程分支」才能合并。"
+                )
+
+            st = porcelain.status(repo, untracked_files="no")
+            staged_now = _normalize_staged(getattr(st, "staged", None))
+            unstaged_now = _normalize_paths(getattr(st, "unstaged", None))
+            if staged_now or unstaged_now:
+                raise GitError(
+                    "工作区存在未提交的更改，合并可能覆盖这些改动。\n"
+                    "请先提交或暂存（可使用「暂存当前更改」）后再合并。"
+                )
+
+            local_sha = repo.refs[b"refs/heads/" + branch]
+            source_sha = repo.refs[source_ref]
+            base_info = {
+                "branch": _to_str(branch),
+                "source": _to_str(source_ref),
+            }
+            if local_sha == source_sha:
+                return {**base_info, "result": "up_to_date", "conflicts": []}
+
+            bases = porcelain.merge_base(repo, [local_sha, source_sha])
+            base = bases[0] if bases else None
+            if base is None:
+                raise GitError(
+                    f"「{_to_str(source_ref)}」与当前分支没有共同历史，无法合并。\n"
+                    "这通常意味着两边是各自独立初始化的仓库。"
+                )
+
+            if base == source_sha:
+                return {**base_info, "result": "already_merged", "conflicts": []}
+
+            if base == local_sha and not no_ff:
+                advanced = _count_commits(repo, source_sha, local_sha)
+                repo.refs[b"refs/heads/" + branch] = source_sha
+                porcelain.reset(repo, "hard", treeish=source_sha)
+                return {
+                    **base_info,
+                    "result": "fast_forward",
+                    "advanced": advanced,
+                    "conflicts": [],
+                }
+
+            # 只读试合并：不动工作区与索引，先看会不会冲突
+            conflicts: list[bytes] = []
+            try:
+                _merged_tree, conflicts = porcelain.merge_tree(
+                    repo, base, local_sha, source_sha
+                )
+            except Exception as exc:  # noqa: BLE001
+                log.warning("合并预检失败，将直接尝试合并: %s", exc)
+                conflicts = []
+            if conflicts:
+                names = "\n".join(f"  • {_to_str(c)}" for c in conflicts[:20])
+                more = f"\n  … 另有 {len(conflicts) - 20} 个文件" if len(conflicts) > 20 else ""
+                raise GitError(
+                    f"检测到合并冲突（{len(conflicts)} 个文件），已阻止本次合并。\n"
+                    "本地与目标分支的代码都没有被改动。\n\n"
+                    f"冲突文件：\n{names}{more}\n\n"
+                    "建议：先提交本地改动，或到命令行手动解决冲突后再合并。"
+                )
+
+            text = message or f"合并分支 {_to_str(source_ref)} 到 {_to_str(branch)}"
+            before_head = local_sha
+            try:
+                merge_sha, merge_conflicts = porcelain.merge(
+                    repo,
+                    source_sha,
+                    no_ff=True,
+                    message=text.encode(),
+                    author=f"{author} <{email}>".encode(),
+                    committer=f"{author} <{email}>".encode(),
+                )
+            except Exception as exc:  # noqa: BLE001
+                _abort_merge(repo, before_head)
+                msg, detail = humanize_error(exc)
+                raise GitError(f"合并失败，已回滚到操作前状态：{msg}", detail) from exc
+
+            if merge_conflicts:
+                _abort_merge(repo, before_head)
+                names = "\n".join(f"  • {_to_str(c)}" for c in merge_conflicts[:20])
+                raise GitError(
+                    "检测到合并冲突，已自动回滚，本地代码未被改动。\n"
+                    f"冲突文件（{len(merge_conflicts)} 个）：\n{names}\n"
+                    "建议：先提交本地改动，或到命令行手动解决冲突后再合并。"
+                )
+
+            return {
+                **base_info,
+                "result": "merged",
+                "commit": merge_sha.decode() if isinstance(merge_sha, bytes) and merge_sha else "",
+                "conflicts": [],
+            }
+
+    @staticmethod
     def push(
         path: str,
         remote: str = "origin",
@@ -1839,6 +1974,29 @@ def upstream_remote_name(upstream: str) -> str:
     """
     match = _UPSTREAM_REMOTE_RE.match(upstream or "")
     return match.group(1) if match else ""
+
+
+def _resolve_merge_source(repo: Repo, source: str) -> bytes | None:
+    """把用户给的分支名解析成仓库里真实存在的 ref。
+
+    支持 ``feature/x``（本地）、``origin/main``（远程跟踪）、
+    ``refs/heads/x`` / ``refs/remotes/origin/x``（完整引用）。
+    本地同名分支优先于远程分支。
+    """
+    name = (source or "").strip()
+    if not name:
+        return None
+    refs = repo.get_refs()
+    candidates: list[str] = []
+    if name.startswith("refs/"):
+        candidates.append(name)
+    candidates.append(f"refs/heads/{name}")
+    candidates.append(f"refs/remotes/{name}")
+    for candidate in candidates:
+        key = candidate.encode()
+        if key in refs:
+            return key
+    return None
 
 
 def _upstream_ref(repo: Repo, branch: bytes) -> bytes | None:

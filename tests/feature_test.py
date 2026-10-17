@@ -1862,6 +1862,202 @@ def test_sync_target(app: QApplication) -> None:
     app.processEvents()
 
 
+def test_merge_branch(app: QApplication) -> None:
+    """分支合并：快进 / 合并提交 / 已包含 / 冲突回滚 / 脏工作区 / UI 入口。"""
+    print("\n== 分支合并 ==")
+    from gitdesk.core.gitengine import GitEngine as _Engine
+
+    def make_repo(name: str) -> str:
+        repo = os.path.join(WORK, name)
+        git("init", "--initial-branch=main", repo)
+        git("config", "user.name", "Tester", cwd=repo)
+        git("config", "user.email", "tester@example.com", cwd=repo)
+        return repo
+
+    def commit(repo: str, fname: str, content: str, msg: str) -> str:
+        with open(os.path.join(repo, fname), "w", encoding="utf-8") as fh:
+            fh.write(content)
+        git("add", "-A", cwd=repo)
+        git("commit", "-m", msg, cwd=repo)
+        return git("rev-parse", "HEAD", cwd=repo).stdout.strip()
+
+    def head(repo: str) -> str:
+        return git("rev-parse", "HEAD", cwd=repo).stdout.strip()
+
+    # ---- 快进 ----
+    repo = make_repo("merge-ff")
+    commit(repo, "a.txt", "a\n", "m1")
+    git("checkout", "-b", "feature", cwd=repo)
+    commit(repo, "b.txt", "b\n", "f1")
+    feature_sha = commit(repo, "b.txt", "b2\n", "f2")
+    git("checkout", "main", cwd=repo)
+    result = _Engine.merge_branch(repo, "feature")
+    check("能快进时直接快进", result.get("result") == "fast_forward", str(result))
+    check("快进后当前分支指向源分支", head(repo) == feature_sha)
+    check("快进报告前进提交数", result.get("advanced") == 2, str(result.get("advanced")))
+
+    # ---- 真合并（分叉 → 产生合并提交）----
+    repo = make_repo("merge-real")
+    commit(repo, "a.txt", "a\n", "m1")
+    git("checkout", "-b", "feature", cwd=repo)
+    commit(repo, "f.txt", "f\n", "f1")
+    git("checkout", "main", cwd=repo)
+    before_sha = commit(repo, "m.txt", "m\n", "m2")
+    result = _Engine.merge_branch(repo, "feature", author="Tester", email="tester@example.com")
+    parents = git("log", "-1", "--format=%P", cwd=repo).stdout.split()
+    check("分叉时生成合并提交", result.get("result") == "merged", str(result))
+    check("合并提交有两个父", len(parents) == 2, str(parents))
+    check("合并后当前分支前进", head(repo) != before_sha)
+    check("合并提交说明可读",
+          "合并分支" in git("log", "-1", "--format=%s", cwd=repo).stdout,
+          git("log", "-1", "--format=%s", cwd=repo).stdout)
+    check("重复合并返回已包含",
+          _Engine.merge_branch(repo, "feature").get("result") == "already_merged")
+
+    # ---- 冲突：必须回滚，且不动工作区 ----
+    repo = make_repo("merge-conflict")
+    commit(repo, "c.txt", "base\n", "m1")
+    git("checkout", "-b", "feature", cwd=repo)
+    commit(repo, "c.txt", "feature\n", "f1")
+    git("checkout", "main", cwd=repo)
+    before_sha = commit(repo, "c.txt", "main\n", "m2")
+    content_before = open(os.path.join(repo, "c.txt"), encoding="utf-8").read()
+    error = ""
+    try:
+        _Engine.merge_branch(repo, "feature")
+    except GitError as exc:
+        error = exc.message
+    check("冲突时给出明确提示", "冲突" in error, error[:80])
+    check("冲突后 HEAD 未变", head(repo) == before_sha)
+    check("冲突后工作区文件未变",
+          open(os.path.join(repo, "c.txt"), encoding="utf-8").read() == content_before)
+    check("冲突后不残留 MERGE_HEAD",
+          not os.path.exists(os.path.join(repo, ".git", "MERGE_HEAD")))
+
+    # ---- 远程分支 / 脏工作区 / 不存在 / 自合并 ----
+    repo = make_repo("merge-remote")
+    commit(repo, "a.txt", "a\n", "m1")
+    git("checkout", "-b", "hotfix", cwd=repo)
+    hotfix_sha = commit(repo, "h.txt", "h\n", "h1")
+    git("checkout", "main", cwd=repo)
+    git("update-ref", "refs/remotes/origin/hotfix", hotfix_sha, cwd=repo)
+    result = _Engine.merge_branch(repo, "origin/hotfix")
+    check("可合并远程跟踪分支", result.get("result") == "fast_forward" and head(repo) == hotfix_sha,
+          str(result))
+
+    git("checkout", "-b", "dirty-src", cwd=repo)
+    commit(repo, "d.txt", "d\n", "d1")
+    git("checkout", "main", cwd=repo)
+    with open(os.path.join(repo, "a.txt"), "w", encoding="utf-8") as fh:
+        fh.write("dirty\n")
+    error = ""
+    try:
+        _Engine.merge_branch(repo, "dirty-src")
+    except GitError as exc:
+        error = exc.message
+    check("工作区有改动时拒绝合并", "未提交" in error, error[:60])
+    git("checkout", "--", ".", cwd=repo)
+
+    error = ""
+    try:
+        _Engine.merge_branch(repo, "no-such-branch")
+    except GitError as exc:
+        error = exc.message
+    check("合并不存在的分支给出提示", "找不到" in error, error[:60])
+    check("自己合并自己返回无需操作",
+          _Engine.merge_branch(repo, "main").get("result") == "up_to_date")
+
+    # ---- UI：分支页签入口 ----
+    repo = os.path.join(WORK, "merge-ui")
+    git("init", "--initial-branch=main", repo)
+    git("config", "user.name", "Tester", cwd=repo)
+    git("config", "user.email", "tester@example.com", cwd=repo)
+    commit(repo, "a.txt", "a\n", "m1")
+    git("checkout", "-b", "feature/ui", cwd=repo)
+    commit(repo, "f.txt", "f\n", "f1")
+    git("checkout", "main", cwd=repo)
+    commit(repo, "m.txt", "m\n", "m2")
+
+    window = MainWindow()
+    window.resize(1400, 900)
+    window.show()
+    app.processEvents()
+    window.goto_key("repos")
+    window.repos_page._register_path(repo)
+    detail = window.repos_page.detail
+    deadline = time.time() + 25
+    while time.time() < deadline:
+        app.processEvents()
+        if detail.local_table.rowCount() >= 2 and (detail._status or {}).get("branch"):
+            break
+        time.sleep(0.02)
+    app.processEvents()
+
+    def row_of(table, name: str) -> int:
+        for r in range(table.rowCount()):
+            item = table.item(r, 0)
+            if item and item.text().replace("★ ", "").strip() == name:
+                return r
+        return -1
+
+    check("分支页签新增合并按钮",
+          detail.btn_branch_merge.text() == "合并到当前分支",
+          detail.btn_branch_merge.text())
+
+    notices: list[tuple] = []
+    detail.notify.connect(lambda message, level="info": notices.append((message, level)))
+
+    detail.local_table.setCurrentCell(-1, -1)
+    detail.local_table.clearSelection()
+    detail.remote_table.setCurrentCell(-1, -1)
+    detail.remote_table.clearSelection()
+    detail._merge_selected_branch()
+    app.processEvents()
+    check("未选中分支时给出提示",
+          any("请先" in m and "合并" in m for m, _ in notices), str(notices[-1:]))
+
+    current_row = row_of(detail.local_table, "main")
+    detail.local_table.setCurrentCell(current_row, 0)
+    detail._merge_selected_branch()
+    app.processEvents()
+    check("选中当前分支时提示无需合并",
+          any("当前分支" in m for m, _ in notices), str(notices[-1:]))
+
+    # 选中 feature/ui → 打桩 confirm + 引擎，验证 UI 串起来
+    import gitdesk.ui.pages.repos as repos_module
+
+    calls: list[tuple] = []
+    original_merge = _Engine.merge_branch
+    original_confirm = repos_module.confirm
+    _Engine.merge_branch = staticmethod(
+        lambda path, source, **kwargs: calls.append((source, kwargs))
+        or {"result": "fast_forward", "source": f"refs/heads/{source}",
+            "branch": "main", "advanced": 1, "conflicts": []}
+    )
+    repos_module.confirm = lambda *a, **k: True
+    try:
+        feature_row = row_of(detail.local_table, "feature/ui")
+        detail.local_table.setCurrentCell(feature_row, 0)
+        detail._merge_selected_branch()
+        deadline = time.time() + 25
+        while time.time() < deadline:
+            app.processEvents()
+            if calls and not detail._busy:
+                break
+            time.sleep(0.02)
+        app.processEvents()
+        check("选中分支后调用合并", [c[0] for c in calls] == ["feature/ui"], str(calls))
+        check("合并会带上提交身份", bool(calls and calls[0][1].get("author")), str(calls[:1]))
+        check("合并完成给出快进提示",
+              any("已快进合并" in m for m, _ in notices), str(notices[-2:]))
+    finally:
+        _Engine.merge_branch = original_merge
+        repos_module.confirm = original_confirm
+
+    window.close()
+    app.processEvents()
+
+
 def test_live(app: QApplication) -> None:
     """联网用例：仅在 GITDESK_LIVE=1 时执行。"""
     if os.environ.get("GITDESK_LIVE") != "1":
@@ -1894,6 +2090,7 @@ def main() -> int:
     test_ui_layout(app)
     test_remote_multi(app)
     test_sync_target(app)
+    test_merge_branch(app)
     test_live(app)
     print("\n" + "=" * 60)
     print(f"通过 {len(PASS)} 项，失败 {len(FAIL)} 项")

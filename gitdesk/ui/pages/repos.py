@@ -360,6 +360,13 @@ class RepoDetailPanel(QWidget):
         bar.setSpacing(8)
         self.btn_branch_switch = QPushButton("切换到选中分支")
         self.btn_branch_switch.clicked.connect(self._switch_branch)
+        self.btn_branch_merge = QPushButton("合并到当前分支")
+        self.btn_branch_merge.setToolTip(
+            "把选中的本地 / 远程分支合并进当前分支：能快进则快进，否则创建合并提交；"
+            "有冲突会自动中止并回滚"
+        )
+        self.btn_branch_merge.setProperty("variant", "primary")
+        self.btn_branch_merge.clicked.connect(self._merge_selected_branch)
         self.btn_branch_new = QPushButton("新建分支")
         self.btn_branch_new.clicked.connect(self._new_branch)
         self.btn_branch_del = QPushButton("删除分支")
@@ -369,6 +376,7 @@ class RepoDetailPanel(QWidget):
         self.btn_branch_pull.setProperty("variant", "ghost")
         self.btn_branch_pull.clicked.connect(lambda: self.do_fetch())
         bar.addWidget(self.btn_branch_switch)
+        bar.addWidget(self.btn_branch_merge)
         bar.addWidget(self.btn_branch_new)
         bar.addWidget(self.btn_branch_del)
         bar.addWidget(self.btn_branch_pull)
@@ -1344,7 +1352,7 @@ class RepoDetailPanel(QWidget):
             self.btn_fetch, self.btn_pull, self.btn_push, self.btn_force_pull,
             self.btn_stash, self.btn_commit, self.btn_stage_all, self.btn_stage_sel,
             self.btn_unstage, self.btn_discard, self.btn_branch_switch,
-            self.btn_branch_new, self.btn_branch_del,
+            self.btn_branch_merge, self.btn_branch_new, self.btn_branch_del,
             self.btn_publish, self.btn_remote_publish, self.btn_remote_push,
         ):
             btn.setEnabled(not busy)
@@ -2223,6 +2231,82 @@ class RepoDetailPanel(QWidget):
             f"已创建并切换到分支 {name.strip()}",
             "新建分支",
         )
+
+    def _selected_branch_name(self) -> str:
+        """当前选中的分支名（优先最近操作的表格：本地 / 远程）。"""
+        tables = (
+            (self.remote_table, self.local_table)
+            if self.remote_table.hasFocus()
+            else (self.local_table, self.remote_table)
+        )
+        for table in tables:
+            row = table.currentRow()
+            if row < 0:
+                continue
+            item = table.item(row, 0)
+            if item is not None and item.text().strip():
+                return item.text().replace("★ ", "").strip()
+        return ""
+
+    def _merge_selected_branch(self) -> None:
+        """把选中的分支合并进当前分支。"""
+        if not self.path:
+            return
+        name = self._selected_branch_name()
+        if not name:
+            self.notify.emit("请先在本地或远程分支列表中选择要合并的分支。", "info")
+            return
+        current = (self._status or {}).get("branch") or ""
+        if not current:
+            show_error(self, "无法合并", "当前仓库处于游离 HEAD 状态，请先切换到具体分支。")
+            return
+        if name == current:
+            self.notify.emit(f"「{name}」就是当前分支，无需合并。", "info")
+            return
+        if not confirm(
+            self,
+            "合并分支",
+            f"把「{name}」合并到当前分支「{current}」吗？\n\n"
+            "· 能快进时直接快进（不产生合并提交）\n"
+            f"· 否则创建合并提交「合并分支 {name} 到 {current}」\n"
+            "· 若存在冲突会自动中止并回滚，本地代码不受影响",
+        ):
+            return
+
+        path = self.path
+        author = (self.cfg.get_setting("git_username", "") or "GitDesk").strip()
+        email = (self.cfg.get_setting("git_email", "") or "gitdesk@localhost").strip()
+        self._set_busy(True, f"正在合并 {name}…", indeterminate=True)
+        log.info("合并分支 %s 到 %s", name, current)
+        self.tasks.run(
+            lambda: GitEngine.merge_branch(path, name, author=author, email=email),
+            on_success=self._on_merge_done,
+            on_error=self._on_action_error,
+            label="合并分支",
+        )
+
+    def _on_merge_done(self, result: dict) -> None:
+        self._set_busy(False)
+        kind = (result or {}).get("result", "")
+        source = (result or {}).get("source", "").replace("refs/heads/", "").replace(
+            "refs/remotes/", ""
+        )
+        target = (result or {}).get("branch", "")
+        if kind == "up_to_date":
+            message = f"「{source}」与当前分支已在同一提交，无需合并"
+        elif kind == "already_merged":
+            message = f"「{source}」已包含在当前分支中，无需合并"
+        elif kind == "fast_forward":
+            message = f"已快进合并「{source}」，前进 {result.get('advanced', 0)} 个提交"
+        else:
+            short = (result.get("commit") or "")[:8]
+            message = f"已合并「{source}」到「{target}」"
+            if short:
+                message += f"，合并提交 {short}"
+        self.notify.emit(f"{message}。", "success")
+        log.info(message)
+        self.refresh_all()
+        self.changed.emit()
 
     def _delete_branch(self) -> None:
         row = self.local_table.currentRow()
