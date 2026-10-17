@@ -30,6 +30,11 @@ from dulwich.index import IndexEntry
 from dulwich.objects import Commit, Tag
 from dulwich.repo import Repo
 
+try:  # dulwich 各版本常量位置略有差异，兜底直接用字符串（get_walker 的签名是 order: str）
+    from dulwich.walk import ORDER_TOPO
+except ImportError:  # pragma: no cover - 仅老版本 dulwich 会走到
+    ORDER_TOPO = "topo"
+
 from .logger import get_logger
 
 log = get_logger("git")
@@ -956,6 +961,39 @@ class GitEngine:
             return out
 
     @staticmethod
+    def graph(path: str, limit: int = 80) -> list[dict]:
+        """提交演化图数据源：从**所有引用**遍历提交（拓扑序，近似时间倒序）。
+
+        与 :meth:`history` 只从 ``HEAD`` 遍历不同，这里把本地分支、远程分支、
+        标签一起作为遍历起点，因此尚未合并到当前分支的提交也会出现在图里。
+
+        遍历使用**拓扑序**（``order="topo"``）：任意提交都排在其所有父提交之前。
+        仅按提交时间排序在「同一秒内多次提交」或时钟回拨时会出现父提交排在子
+        提交之上的情况，泳道图会因此错乱。
+
+        Args:
+            path: 仓库路径。
+            limit: 最多返回的提交条数。
+
+        Returns:
+            每项含 ``sha/short/subject/author/date/timestamp/parents/refs``，
+            其中 ``refs`` 为短标签（``main`` / ``origin/main`` / ``v1``，
+            ``HEAD`` 指向的提交额外带 ``HEAD``）。空仓库或读取失败时返回
+            空列表而不抛异常，避免打断界面其它区域的刷新。
+        """
+        if not path or not os.path.isdir(path):
+            # 空路径会被 dulwich 当成当前目录，必须显式拦住
+            return []
+        try:
+            with _repo(path) as repo:
+                return _graph_entries(repo, limit)
+        except GitError:
+            return []
+        except Exception:  # noqa: BLE001 - 图形展示失败不应影响页面其它区域
+            log.debug("读取提交图失败: %s", path, exc_info=True)
+            return []
+
+    @staticmethod
     def branches(path: str) -> dict:
         """本地与远程分支列表。"""
         with _repo(path) as repo:
@@ -1828,6 +1866,160 @@ def _refs_at(repo: Repo, sha: bytes) -> list[str]:
         return [_to_str(name) for name, value in repo.get_refs().items() if value == sha]
     except Exception:
         return []
+
+
+# --------------------------------------------------------------------------- #
+# 提交演化图数据
+# --------------------------------------------------------------------------- #
+
+#: 引用前缀 → (展示优先级, 前缀长度)。数字越小越靠前：
+#: 本地分支 → HEAD → 远程分支 → 标签
+_GRAPH_REF_RULES: tuple[tuple[bytes, int, int], ...] = (
+    (b"refs/heads/", 0, len(b"refs/heads/")),
+    (b"refs/remotes/", 2, len(b"refs/remotes/")),
+    (b"refs/tags/", 3, len(b"refs/tags/")),
+)
+
+
+def _short_ref_label(name: bytes) -> tuple[str | None, int]:
+    """把完整引用名转换成「短标签 + 排序优先级」。
+
+    ``refs/heads/main`` → ``("main", 0)``；
+    ``refs/remotes/origin/main`` → ``("origin/main", 2)``；
+    ``refs/tags/v1`` → ``("v1", 3)``；
+    其它引用（含 ``refs/remotes/*/HEAD``）返回 ``(None, 0)``。
+    """
+    for prefix, priority, offset in _GRAPH_REF_RULES:
+        if not name.startswith(prefix):
+            continue
+        if prefix == b"refs/remotes/" and name.endswith(b"/HEAD"):
+            return None, 0
+        return _to_str(name[offset:]), priority
+    return None, 0
+
+
+def _peel_commit(repo: Repo, sha: bytes) -> bytes | None:
+    """把引用指向的对象逐层解引用为提交 id；不是提交时返回 ``None``。"""
+    current = sha
+    for _ in range(5):  # 标签套标签的极端情况，最多解 5 层
+        try:
+            obj = repo[current]
+        except KeyError:
+            return None
+        except Exception:  # noqa: BLE001 - 损坏对象直接跳过
+            return None
+        if isinstance(obj, Commit):
+            return obj.id
+        if not isinstance(obj, Tag):
+            return None
+        target = getattr(obj, "object", None)
+        if not (isinstance(target, tuple) and len(target) == 2):
+            return None
+        current = target[1]
+    return None
+
+
+def _head_target(repo: Repo) -> bytes | None:
+    """``HEAD`` 指向的提交 id；游离 / 未出生分支等情况返回 ``None``。"""
+    try:
+        _followed, sha = repo.refs.follow(b"HEAD")
+    except Exception:  # noqa: BLE001 - 空仓库 HEAD 未出生
+        return None
+    return sha or None
+
+
+def _walk_commits(
+    repo: Repo, includes: set[bytes], limit: int, head_sha: bytes | None
+) -> list[Commit]:
+    """按拓扑序收集提交，并保证窗口内包含 ``HEAD``（除非历史本身不足）。
+
+    必须使用拓扑序：默认的 ``date`` 序在多个提交时间戳相同（或时钟回拨）时
+    不保证「子提交先于父提交」，泳道图会把父提交画到子提交上方。
+
+    由于 dulwich 先按 ``max_entries`` 截断、再做拓扑重排，同一秒内提交较多时
+    截断出的窗口可能不含 ``HEAD``。这里做**有界扩窗**：窗口内没有 ``HEAD``
+    就把窗口放大 4 倍重试（最多 4 次），命中或历史耗尽即停；正常仓库第一次
+    就会命中，没有额外开销。
+
+    Returns:
+        拓扑序（子提交在前）的提交列表，最多 ``limit`` 条；失败时返回空列表。
+    """
+    window = limit
+    for _ in range(4):
+        try:
+            walker = repo.get_walker(
+                include=sorted(includes), max_entries=window, order=ORDER_TOPO
+            )
+            commits = [entry.commit for entry in walker]
+        except Exception:  # noqa: BLE001 - 对象缺失 / 浅克隆等情况
+            return []
+        exhausted = len(commits) < window
+        if exhausted or head_sha is None or any(item.id == head_sha for item in commits):
+            return commits[:limit]
+        window = min(window * 4, 5120)
+    return commits[:limit]
+
+
+def _graph_entries(repo: Repo, limit: int) -> list[dict]:
+    """从所有引用收集提交，生成提交演化图所需的数据（内部实现）。
+
+    为了性能只做**一次** ``repo.get_refs()``，在内存里建立
+    「提交 sha → 引用标签」的映射，避免对每个提交都全量扫描引用。
+    """
+    try:
+        raw_refs = repo.get_refs()
+    except Exception:  # noqa: BLE001
+        return []
+    if not raw_refs:
+        return []
+
+    labels: dict[bytes, list[tuple[int, str]]] = {}
+    includes: set[bytes] = set()
+    for name, sha in raw_refs.items():
+        if name == b"HEAD":
+            continue
+        label, priority = _short_ref_label(name)
+        if label is None:
+            continue
+        target = _peel_commit(repo, sha)
+        if target is None:
+            continue
+        includes.add(target)
+        labels.setdefault(target, []).append((priority, label))
+
+    head_sha = _head_target(repo)
+    if head_sha is not None:
+        includes.add(head_sha)
+        # HEAD 排在本地分支之后、远程分支之前，便于界面优先展示分支名再高亮 HEAD
+        labels.setdefault(head_sha, []).append((1, "HEAD"))
+    if not includes:
+        return []
+
+    max_entries = max(1, int(limit or 1))
+    commits = _walk_commits(repo, includes, max_entries, head_sha)
+    if not commits:
+        return []
+
+    result: list[dict] = []
+    for commit in commits:
+        message = _commit_message(commit)
+        sha_text = commit.id.decode()
+        result.append(
+            {
+                "sha": sha_text,
+                "short": sha_text[:8],
+                "subject": message.splitlines()[0] if message else "",
+                "author": _to_str(commit.author).rsplit(" <", 1)[0],
+                "date": _fmt_ts(commit.commit_time),
+                "timestamp": commit.commit_time,
+                "parents": [parent.decode() for parent in commit.parents],
+                "refs": [label for _priority, label in sorted(labels.get(commit.id, []))],
+            }
+        )
+        if len(result) >= max_entries:
+            break
+    return result
+
 
 
 def _change_type(change) -> str:

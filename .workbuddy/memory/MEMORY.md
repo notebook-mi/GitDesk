@@ -25,6 +25,12 @@ Windows 桌面端 GitHub/Gitee 仓库管理器，交付单文件绿色 exe，内
 - 要支持「中途停止」的网络方法必须把 `cancel: CancelToken` 一路透传到
   `_retry_network(..., cancel=)`；`CancelToken.wait(timeout)` 负责让退避等待也能被立刻打断
   （`_sleep_or_cancel`）。取消一律转成 `CancelledError`（`Task` 会走 `cancelled` 信号而非 `failed`）
+- **`get_walker` 默认 `order="date"` 不保证拓扑序**：`commit_time` 相同时会按对象比较排序，
+  父提交可能排到子提交之前。要画图/走拓扑必须 `get_walker(..., order=ORDER_TOPO)`
+  （`dulwich.walk.ORDER_TOPO == "topo"`）。
+  另注意 dulwich **先按 `max_entries` 截断、再拓扑重排** → 同秒提交多时窗口可能不含 HEAD
+- `Repo("")` 等价 `Repo(".")`，会把 cwd 当仓库打开；按路径的 API 必须先
+  `if not path or not os.path.isdir(path): return []`（`graph()` 已加，`history()` 仍有同款隐患）
 
 
 ## 发布到远程（一键建仓）
@@ -65,6 +71,12 @@ Windows 桌面端 GitHub/Gitee 仓库管理器，交付单文件绿色 exe，内
   （「与 github 一致 / 领先 github 2」），获取 / 拉取 / 推送统一走 `_sync_remote()`
   （**跟踪远程 → origin → 第一个**），`do_push` 仅在目标≠上游时 `set_upstream=True`，
   概览提示 `_hint_text()` 写明当前作用的远程
+- **提交演化图**：`core/graph.py::layout_graph(commits, *, max_lanes=8)` 是纯函数（对外签名不可变），
+  内部用「活跃泳道 + 稳定拓扑校正」；`ui/graphview.py::CommitGraphView` 是 `QAbstractScrollArea` + QPainter。
+  两条不变量刻在测试里：① connector 端点 ≤「真正出现过圆点的最大泳道」（禁止悬空线）；
+  ② 「本行圆点 → 下一行圆点」的连线必须指向本行父提交（禁止误指）。
+  泳道分配时 `parents[1:]` 必须先查 `active` 里是否已有泳道在等该父（命中→merge 线、不新占泳道），
+  共享祖先保留最左泳道作主线（`survivor = min(...)`）
 - 主题：`ui/style.py::apply_light_theme()` 把应用锁定为浅色（`QStyleHints.setColorScheme(Light)`）。
   原因：`QScrollArea.setWidget()` 会打开子控件 autoFillBackground，深色系统主题下会自绘成黑底；
   凡是「按调色板自绘背景」的控件都必须显式指定浅色背景

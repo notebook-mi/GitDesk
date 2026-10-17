@@ -47,9 +47,11 @@ from ...core.gitengine import (
     GitError,
     SyncState,
 )
+from ...core.graph import layout_graph
 from ...core.logger import get_logger
 from ...core.publish import PublishPlan, publish_local
 from ...core.tree import filter_tree, format_size, list_dir, summarize
+from ..graphview import CommitGraphView
 from ..publish_dialog import PublishDialog
 from ..widgets import (
     Badge,
@@ -408,7 +410,39 @@ class RepoDetailPanel(QWidget):
         rh.setSectionResizeMode(1, QHeaderView.ResizeToContents)
         rv.addWidget(self.remote_table)
         splitter.addWidget(right)
-        layout.addWidget(splitter, 1)
+        splitter.setStretchFactor(0, 3)
+        splitter.setStretchFactor(1, 2)
+
+        # 上：分支列表；下：提交演化图（Git 提交历史的分支泳道图）
+        outer = QSplitter(Qt.Vertical)
+        outer.addWidget(splitter)
+
+        graph_box = QWidget()
+        gv = QVBoxLayout(graph_box)
+        gv.setContentsMargins(0, 0, 0, 0)
+        gv.setSpacing(6)
+        graph_head = QHBoxLayout()
+        graph_head.setSpacing(8)
+        graph_head.addWidget(_section_label("提交演化图"))
+        graph_head.addStretch(1)
+        self.btn_graph_refresh = QPushButton("刷新")
+        self.btn_graph_refresh.setProperty("variant", "ghost")
+        self.btn_graph_refresh.setObjectName("MiniButton")
+        self.btn_graph_refresh.setToolTip("重新读取最近 80 条提交并重绘分支演化图")
+        self.btn_graph_refresh.clicked.connect(lambda: self.refresh_graph())
+        graph_head.addWidget(self.btn_graph_refresh)
+        self.graph_hint = QLabel("最近 80 条提交")
+        self.graph_hint.setObjectName("Faint")
+        graph_head.addWidget(self.graph_hint)
+        gv.addLayout(graph_head)
+        self.graph_view = CommitGraphView()
+        self.graph_view.setToolTip("鼠标悬停可查看完整提交 hash 与说明")
+        gv.addWidget(self.graph_view, 1)
+        outer.addWidget(graph_box)
+        outer.setSizes([320, 300])
+        outer.setStretchFactor(0, 1)
+        outer.setStretchFactor(1, 1)
+        layout.addWidget(outer, 1)
         return page
 
     def _build_remotes(self) -> QWidget:
@@ -764,6 +798,8 @@ class RepoDetailPanel(QWidget):
         self.history_table.setRowCount(0)
         self.local_table.setRowCount(0)
         self.remote_table.setRowCount(0)
+        if hasattr(self, "graph_view"):
+            self.graph_view.clear()
         self._remote_rendering = True
         self.remote_list.setRowCount(0)
         self._remote_rendering = False
@@ -1126,6 +1162,27 @@ class RepoDetailPanel(QWidget):
             on_error=lambda m, d: log.warning("读取分支失败: %s", m),
             label="读取分支列表",
         )
+        self.refresh_graph()
+
+    def refresh_graph(self) -> None:
+        """读取提交演化图数据并重绘分支泳道图。"""
+        if not self.path or not os.path.isdir(self.path):
+            if hasattr(self, "graph_view"):
+                self.graph_view.clear()
+            return
+        path = self.path
+        self.tasks.run(
+            lambda: layout_graph(GitEngine.graph(path, 80)),
+            on_success=lambda rows: self._render_graph(path, rows),
+            on_error=lambda m, d: log.warning("读取提交图失败: %s", m),
+            label="读取提交图",
+        )
+
+    def _render_graph(self, path: str, rows: list) -> None:
+        """把后台读到的图数据交给绘图控件（仓库已切换时丢弃过期结果）。"""
+        if path != self.path:
+            return
+        self.graph_view.set_commits(rows)
 
     def _render_branches(self, data: dict) -> None:
         locals_ = data.get("local", [])

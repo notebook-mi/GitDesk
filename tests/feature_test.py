@@ -4,7 +4,8 @@
 
 1. 克隆可中止（停止克隆按钮 + 取消令牌 + 残留目录清理）；
 2. 远程仓库页交互（左键仅选中、右键查看详情、删除远程仓库）；
-3. GitHub 热门榜瀑布流（榜单解析 + 简介中文化 + 最短列排布）。
+3. GitHub 热门榜瀑布流（榜单解析 + 简介中文化 + 最短列排布）；
+4. 分支页签的提交演化图（泳道布局算法 + 引擎数据源 + 自绘控件）。
 
 除个别联网用例用环境变量开关外，全部离线运行。
 """
@@ -41,8 +42,8 @@ def check(name: str, cond: bool, extra: str = "") -> None:
     print(f"  [{'PASS' if cond else 'FAIL'}] {name} {'' if cond else extra}")
 
 
-def git(*args, cwd=None):
-    return subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True)
+def git(*args, cwd=None, env=None):
+    return subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, env=env)
 
 
 def make_bare_remote(name: str) -> str:
@@ -928,6 +929,448 @@ def test_structure_tree() -> None:
     check("零字节显示占位", tree.format_size(0) == "—", tree.format_size(0))
 
 
+def test_commit_graph() -> None:
+    """分支页签的提交演化图：泳道算法 + 引擎数据源 + 自绘控件。"""
+    print("\n== 提交演化图 ==")
+    from gitdesk.core.graph import layout_graph
+    from gitdesk.ui.graphview import CommitGraphView
+
+    def commit(sha: str, parents=(), refs=(), subject: str = "改动", ts: int = 0) -> dict:
+        return {
+            "sha": sha,
+            "short": sha[:8],
+            "parents": list(parents),
+            "refs": list(refs),
+            "subject": subject,
+            "author": "Dev",
+            "date": "2024-01-01 10:00:00",
+            "timestamp": ts,
+        }
+
+    # 1) 线性历史：全部落在 0 号泳道
+    linear = [
+        commit(f"{i:040x}", [f"{i - 1:040x}"] if i > 1 else [], subject=f"第 {i} 个提交")
+        for i in range(5, 0, -1)
+    ]
+    rows = layout_graph(linear)
+    check("线性历史行数与输入一致", len(rows) == 5, str(len(rows)))
+    check("线性历史全部落在 0 号泳道", all(r.lane == 0 for r in rows), str([r.lane for r in rows]))
+    check("线性历史没有合并提交", not any(r.is_merge for r in rows))
+    check("线性历史末行没有连线", rows[-1].connectors == [], str(rows[-1].connectors))
+    check("线性历史中间行有同泳道直线",
+          rows[0].connectors == [{"from": 0, "to": 0, "kind": "straight"}],
+          str(rows[0].connectors))
+
+    # 2) main 两个提交 + feature 从第 2 个提交分叉 + 合并回 main
+    sha_a, sha_b, sha_d, sha_f, sha_m = "a" * 40, "b" * 40, "d" * 40, "f" * 40, "m" * 40
+    fork = [
+        commit(sha_m, [sha_d, sha_f], refs=["main", "HEAD"], subject="合并 feature", ts=5),
+        commit(sha_d, [sha_b], subject="main 上的提交", ts=4),
+        commit(sha_f, [sha_b], refs=["feature"], subject="feature 上的提交", ts=3),
+        commit(sha_b, [sha_a], subject="main 第二个提交", ts=2),
+        commit(sha_a, [], subject="初始提交", ts=1),
+    ]
+    rows = layout_graph(fork)
+    lanes = {row.lane for row in rows}
+    check("分叉历史出现至少两条泳道", len(lanes) >= 2, str(sorted(lanes)))
+    check("合并提交被标记 is_merge", rows[0].is_merge is True and rows[1].is_merge is False,
+          str([row.is_merge for row in rows]))
+    check("合并提交行有分叉连线",
+          any(c["kind"] == "branch" for c in rows[0].connectors), str(rows[0].connectors))
+    kinds = {c["kind"] for row in rows for c in row.connectors}
+    check("图中出现 merge 连接线", "merge" in kinds, str(sorted(kinds)))
+    merge_targets = {c["to"] for row in rows for c in row.connectors if c["kind"] == "merge"}
+    check("merge 连线汇入公共祖先所在泳道", merge_targets == {rows[3].lane},
+          f"{merge_targets} vs {rows[3].lane}")
+    lane_by_sha = {row.sha: row.lane for row in rows}
+    check("feature 分支落在与 main 不同的泳道",
+          lane_by_sha[sha_f] != lane_by_sha[sha_d], str(lane_by_sha))
+    check("合并后回到 main 的泳道",
+          lane_by_sha[sha_b] == lane_by_sha[sha_d] == lane_by_sha[sha_m], str(lane_by_sha))
+
+    # 3) parents 传递：每个父提交都应出现在后续行里
+    unresolved = [
+        (row.sha[:4], parent[:4])
+        for index, row in enumerate(rows)
+        for parent in row.parents
+        if parent not in {item.sha for item in rows[index + 1:]}
+    ]
+    check("每个父提交都能在后续行中找到", not unresolved, str(unresolved))
+
+    # 4) refs / HEAD 标记
+    check("refs 正确透传", rows[0].refs == ["main", "HEAD"], str(rows[0].refs))
+    check("refs 含 HEAD 的提交被标记 is_head", rows[0].is_head is True)
+    check("非 HEAD 行不带 is_head", all(not row.is_head for row in rows[1:]))
+
+    # 5) 稳定性与容错
+    again = layout_graph(fork)
+    check("同一输入输出确定",
+          [(r.lane, r.connectors) for r in again] == [(r.lane, r.connectors) for r in rows])
+    sparse = layout_graph([{"sha": "x" * 40}, {"sha": "y" * 40, "parents": ["x" * 40]}])
+    check("缺少可选字段时不抛异常（且自动按子先于父校正）",
+          len(sparse) == 2
+          and sparse[0].short == "y" * 8
+          and sparse[0].subject == ""
+          and sparse[0].connectors == [{"from": 0, "to": 0, "kind": "straight"}],
+          str(sparse[0]))
+    check("空输入返回空列表", layout_graph([]) == [])
+    limited = layout_graph(
+        [commit("z" * 40, ["x" * 40, "y" * 40, "w" * 40]), commit("x" * 40),
+         commit("y" * 40), commit("w" * 40)],
+        max_lanes=2,
+    )
+    check("泳道数量受 max_lanes 限制", max(r.lane for r in limited) <= 1,
+          str([r.lane for r in limited]))
+
+    # 6) 真实仓库：造一个分叉 + 合并的历史
+    repo = os.path.join(WORK, "graph-repo")
+    git("init", "--initial-branch=main", repo)
+    git("config", "user.name", "Tester", cwd=repo)
+    git("config", "user.email", "tester@example.com", cwd=repo)
+
+    def make_commit(name: str, text: str, message: str) -> None:
+        with open(os.path.join(repo, name), "w", encoding="utf-8") as fh:
+            fh.write(text)
+        git("add", "-A", cwd=repo)
+        git("commit", "-m", message, cwd=repo)
+
+    make_commit("a.txt", "a\n", "A")
+    make_commit("b.txt", "b\n", "B")
+    git("checkout", "-b", "feature", cwd=repo)
+    make_commit("f1.txt", "f1\n", "F1")
+    make_commit("f2.txt", "f2\n", "F2")
+    git("checkout", "main", cwd=repo)
+    make_commit("c.txt", "c\n", "C")
+    git("merge", "--no-ff", "feature", "-m", "merge feature", cwd=repo)
+    git("tag", "v1", cwd=repo)
+
+    data = GitEngine.graph(repo)
+    check("引擎从所有引用读取提交图", len(data) >= 6, str(len(data)))
+    check("引擎识别合并提交（两个父）",
+          any(len(item["parents"]) == 2 for item in data),
+          str([len(item["parents"]) for item in data]))
+    check("引擎给出短标签（去掉 refs/ 前缀）",
+          any(item["refs"] for item in data)
+          and all(not ref.startswith("refs/") for item in data for ref in item["refs"]),
+          str([item["refs"] for item in data]))
+    check("HEAD 标记落在当前分支的提交上",
+          any("HEAD" in item["refs"] for item in data),
+          str([item["refs"] for item in data]))
+    check("标签以短名出现在 refs 中",
+          any("v1" in item["refs"] for item in data), str([item["refs"] for item in data]))
+    check("提交按时间倒序",
+          all(data[i]["timestamp"] >= data[i + 1]["timestamp"] for i in range(len(data) - 1)))
+    check("不存在的路径返回空列表",
+          GitEngine.graph(os.path.join(WORK, "no-such-graph-repo")) == [])
+    real_rows = layout_graph(data)
+    check("真实仓库可生成泳道布局", len(real_rows) == len(data), f"{len(real_rows)} / {len(data)}")
+    check("真实仓库出现多条泳道", len({row.lane for row in real_rows}) >= 2,
+          str([row.lane for row in real_rows]))
+
+    # 7) 自绘控件
+    view = CommitGraphView()
+    view.resize(560, 60)  # 视口比内容矮时出现纵向滚动
+    view.set_commits(layout_graph(fork))
+    check("图控件行数与数据一致", view.row_count() == len(fork), str(view.row_count()))
+    check("图控件滚动范围随行数变化", view.verticalScrollBar().maximum() > 0,
+          str(view.verticalScrollBar().maximum()))
+    painted = True
+    try:
+        view.grab()  # 触发一次真实绘制，验证自绘路径不抛异常
+    except Exception as exc:  # noqa: BLE001
+        painted = False
+        print("     绘制异常:", exc)
+    check("图控件可正常自绘", painted)
+    view.set_commits([])
+    check("空数据不崩溃且行数为 0", view.row_count() == 0)
+    view.clear()
+    check("clear 后行数为 0", view.row_count() == 0)
+    view.set_commits([], error="读取提交图失败")
+    check("错误空状态可安全绘制", view.row_count() == 0)
+    view.set_commits(layout_graph(data))
+    view.resize(640, 160)
+    check("真实仓库图可绘制", view.row_count() == len(data))
+    view.deleteLater()
+
+    # 8) 拓扑顺序（P0：同一时间戳 / 父子倒挂）
+    from gitdesk.core.graph import layout_graph as _layout
+
+    reversed_chain = [
+        commit("a" * 40, [], subject="root"),
+        commit("b" * 40, ["a" * 40], subject="mid"),
+        commit("c" * 40, ["b" * 40], subject="head"),
+    ]
+    fixed = _layout(reversed_chain)
+    check("乱序输入被拓扑校正为子先于父",
+          [row.short for row in fixed] == ["c" * 8, "b" * 8, "a" * 8],
+          str([row.short for row in fixed]))
+    ordered_chain = [
+        commit("c" * 40, ["b" * 40], subject="head"),
+        commit("b" * 40, ["a" * 40], subject="mid"),
+        commit("a" * 40, [], subject="root"),
+    ]
+    check("已拓扑有序的输入保持原序",
+          [row.short for row in _layout(ordered_chain)] == ["c" * 8, "b" * 8, "a" * 8])
+
+    same_time = [
+        commit("a" * 40, [], subject="root", ts=1000),
+        commit("b" * 40, ["a" * 40], subject="mid", ts=1000),
+        commit("f" * 40, ["b" * 40], subject="feature", ts=1000),
+        commit("d" * 40, ["b" * 40], subject="main", ts=1000),
+        commit("m" * 40, ["d" * 40, "f" * 40], subject="merge", ts=1000),
+    ]
+    fixed = _layout(same_time)
+    fixed_index = {row.sha: index for index, row in enumerate(fixed)}
+    check("同一时间戳的乱序输入会把合并提交排到两个父之前",
+          fixed_index["m" * 40] < fixed_index["d" * 40]
+          and fixed_index["m" * 40] < fixed_index["f" * 40],
+          str([row.short for row in fixed]))
+    check("拓扑校正后父提交永远在子提交之后",
+          all(
+              fixed_index[parent] > index
+              for index, row in enumerate(fixed)
+              for parent in row.parents
+              if parent in fixed_index
+          ),
+          str([(row.short, [p[:4] for p in row.parents]) for row in fixed]))
+
+    same_env = dict(
+        os.environ,
+        GIT_AUTHOR_DATE="2026-01-01T00:00:00",
+        GIT_COMMITTER_DATE="2026-01-01T00:00:00",
+    )
+
+    def same_time_commit(cwd: str, name: str, message: str) -> None:
+        with open(os.path.join(cwd, name), "w", encoding="utf-8") as fh:
+            fh.write(message + "\n")
+        git("add", "-A", cwd=cwd, env=same_env)
+        git("commit", "-m", message, cwd=cwd, env=same_env)
+
+    linear_repo = os.path.join(WORK, "graph-same-time")
+    git("init", "--initial-branch=main", linear_repo, env=same_env)
+    git("config", "user.name", "Tester", cwd=linear_repo)
+    git("config", "user.email", "tester@example.com", cwd=linear_repo)
+    for step in range(1, 6):
+        same_time_commit(linear_repo, f"c{step}.txt", f"提交 {step}")
+
+    same_data = GitEngine.graph(linear_repo)
+    expected = git("rev-list", "HEAD", cwd=linear_repo, env=same_env).stdout.split()
+    same_shorts = [item["short"] for item in same_data]
+    same_index = {item["sha"]: index for index, item in enumerate(same_data)}
+    check("同一时间戳的线性仓库按 HEAD→root 返回",
+          [item["sha"] for item in same_data] == expected, str(same_shorts))
+    check("同一时间戳下引擎仍保证父提交在后",
+          all(same_index[parent] > same_index[item["sha"]]
+              for item in same_data
+              for parent in item["parents"] if parent in same_index),
+          str(same_shorts))
+
+    fork_repo = os.path.join(WORK, "graph-same-time-fork")
+    git("init", "--initial-branch=main", fork_repo, env=same_env)
+    git("config", "user.name", "Tester", cwd=fork_repo)
+    git("config", "user.email", "tester@example.com", cwd=fork_repo)
+    same_time_commit(fork_repo, "a.txt", "A")
+    same_time_commit(fork_repo, "b.txt", "B")
+    git("checkout", "-b", "feature", cwd=fork_repo, env=same_env)
+    same_time_commit(fork_repo, "f1.txt", "F1")
+    git("checkout", "main", cwd=fork_repo, env=same_env)
+    same_time_commit(fork_repo, "c.txt", "C")
+    git("merge", "--no-ff", "feature", "-m", "merge feature", cwd=fork_repo, env=same_env)
+
+    fork_data = GitEngine.graph(fork_repo)
+    fork_index = {item["sha"]: index for index, item in enumerate(fork_data)}
+    merge_item = next(item for item in fork_data if len(item["parents"]) == 2)
+    check("同一时间戳的分叉合并仓库把合并提交放在最前",
+          fork_index[merge_item["sha"]] == 0, str([i["short"] for i in fork_data]))
+    check("同一时间戳下合并提交位于两个父之前",
+          all(fork_index[parent] > 0 for parent in merge_item["parents"]),
+          str({p[:8]: fork_index.get(p) for p in merge_item["parents"]}))
+    check("同一时间戳下分叉仓库也无父子倒挂",
+          all(fork_index[parent] > fork_index[item["sha"]]
+              for item in fork_data
+              for parent in item["parents"] if parent in fork_index),
+          str([i["short"] for i in fork_data]))
+
+    truncated = GitEngine.graph(fork_repo, 3)
+    check("截断条数仍以 HEAD 开头（有界扩窗）",
+          len(truncated) == 3 and any("HEAD" in item["refs"] for item in truncated),
+          str([(i["short"], i["refs"]) for i in truncated]))
+    truncated_rows = _layout(truncated)
+    truncated_index = {row.sha: index for index, row in enumerate(truncated_rows)}
+    check("截断后仍无父子倒挂（父不在列表时按根处理）",
+          len(truncated_rows) == 3
+          and all(
+              truncated_index[parent] > index
+              for index, row in enumerate(truncated_rows)
+              for parent in row.parents
+              if parent in truncated_index
+          ),
+          str([(row.short, [p[:4] for p in row.parents]) for row in truncated_rows]))
+    # 8.1) criss-cross（双向互相合并）：每个父提交都必须能沿线走到
+    def _graph_reachable(layout_rows, start: int, lane: int, target_row: int, target_lane: int) -> bool:
+        """沿 connectors 从 (start, lane) 走一行一行，能否到达 (target_row, target_lane)。"""
+        seen = {(start, lane)}
+        stack = [(start, lane)]
+        while stack:
+            row_index, current = stack.pop()
+            if (row_index, current) == (target_row, target_lane):
+                return True
+            if row_index >= target_row:
+                continue
+            for connector in layout_rows[row_index].connectors:
+                if int(connector["from"]) != current:
+                    continue
+                step = (row_index + 1, int(connector["to"]))
+                if step not in seen:
+                    seen.add(step)
+                    stack.append(step)
+        return False
+
+    def broken_links(layout_rows) -> list[tuple[str, str]]:
+        """返回「父提交在输出中但连线走不到」的 (子, 父) 列表。"""
+        position = {row.sha: index for index, row in enumerate(layout_rows)}
+        result: list[tuple[str, str]] = []
+        for index, row in enumerate(layout_rows):
+            for parent in row.parents:
+                if parent not in position:
+                    continue
+                target = position[parent]
+                if not _graph_reachable(
+                    layout_rows, index, row.lane, target, layout_rows[target].lane
+                ):
+                    result.append((row.sha[:8], parent[:8]))
+        return result
+
+    def out_of_range(layout_rows) -> list[str]:
+        """返回端点落在「没有任何圆点」的越界泳道上的连线。
+
+        不变量：任何 connector 的 from/to 都必须 ≤ 圆点实际出现过的最大泳道号，
+        即图中不允许存在「永远没有圆点落座」的泳道（截断时窗口外父提交直接
+        当根处理、不占泳道，因此该不变量对完整图与截断图都成立）。
+        """
+        max_lane = max((row.lane for row in layout_rows), default=0)
+        return [
+            f"{row.sha[:8]}:{connector['from']}→{connector['to']}"
+            for row in layout_rows
+            for connector in row.connectors
+            if int(connector["from"]) > max_lane or int(connector["to"]) > max_lane
+        ]
+
+    criss_cross = [
+        {"sha": "M3", "parents": ["M1", "M2"], "timestamp": 6},
+        {"sha": "M2", "parents": ["x1", "M1"], "timestamp": 5},
+        {"sha": "M1", "parents": ["m2", "x1"], "timestamp": 4},
+        {"sha": "m2", "parents": ["m1"], "timestamp": 3},
+        {"sha": "x1", "parents": ["m1"], "timestamp": 2},
+        {"sha": "m1", "parents": [], "timestamp": 1},
+    ]
+    criss_rows = _layout(criss_cross)
+    check("criss-cross 场景无断裂父子连线",
+          broken_links(criss_rows) == [], str(broken_links(criss_rows)))
+    criss_pos = {row.sha: index for index, row in enumerate(criss_rows)}
+    check("criss-cross 中 M2→M1 的连线可达",
+          _graph_reachable(criss_rows, criss_pos["M2"], criss_rows[criss_pos["M2"]].lane,
+                           criss_pos["M1"], criss_rows[criss_pos["M1"]].lane))
+    check("criss-cross 不为已等待的父提交重复占泳道",
+          max(row.lane for row in criss_rows) <= 1,
+          str([(row.sha, row.lane) for row in criss_rows]))
+    check("criss-cross 的连线端点都落在有圆点的泳道上",
+          out_of_range(criss_rows) == [], str(out_of_range(criss_rows)))
+    check("分叉合并场景同样无断裂父子连线",
+          broken_links(_layout(fork)) == [], str(broken_links(_layout(fork))))
+    check("分叉合并场景的连线端点都合法",
+          out_of_range(_layout(fork)) == [], str(out_of_range(_layout(fork))))
+    check("截断图的连线端点同样不越界（窗口外父提交当根、不占泳道）",
+          out_of_range(_layout(truncated)) == [], str(out_of_range(_layout(truncated))))
+
+    cross_repo = os.path.join(WORK, "graph-criss-cross")
+    git("init", "--initial-branch=main", cross_repo)
+    git("config", "user.name", "Tester", cwd=cross_repo)
+    git("config", "user.email", "tester@example.com", cwd=cross_repo)
+
+    def cross_commit(name: str, message: str) -> None:
+        with open(os.path.join(cross_repo, name), "w", encoding="utf-8") as fh:
+            fh.write(message + "\n")
+        git("add", "-A", cwd=cross_repo)
+        git("commit", "-m", message, cwd=cross_repo)
+
+    cross_commit("m1.txt", "m1")
+    git("checkout", "-b", "x", cwd=cross_repo)
+    cross_commit("x1.txt", "x1")
+    git("checkout", "main", cwd=cross_repo)
+    cross_commit("m2.txt", "m2")
+    git("merge", "--no-ff", "x", "-m", "M1 合并 x", cwd=cross_repo)
+    git("checkout", "x", cwd=cross_repo)
+    git("merge", "--no-ff", "main", "-m", "M2 合并 main", cwd=cross_repo)
+    git("checkout", "main", cwd=cross_repo)
+    git("merge", "--no-ff", "x", "-m", "M3 再次合并 x", cwd=cross_repo)
+
+    cross_data = GitEngine.graph(cross_repo)
+    cross_rows = _layout(cross_data)
+    check("真实 criss-cross 仓库读到 6 个提交", len(cross_data) == 6,
+          str([item["short"] for item in cross_data]))
+    check("真实 criss-cross 仓库无断裂父子连线",
+          broken_links(cross_rows) == [], str(broken_links(cross_rows)))
+    check("真实 criss-cross 仓库合并提交数正确",
+          sum(1 for item in cross_data if len(item["parents"]) == 2) == 3,
+          str([len(item["parents"]) for item in cross_data]))
+    check("真实 criss-cross 仓库连线端点都落在有圆点的泳道上",
+          out_of_range(cross_rows) == [], str(out_of_range(cross_rows)))
+
+    # 8.2) 空路径不能回退到当前工作目录（dulwich 的 Repo("") 等价 "."，测试时 cwd 本身就是仓库）
+    check("graph('') 在 cwd 是仓库时也返回空列表", GitEngine.graph("") == [])
+    check("graph(普通文件) 返回空列表",
+          GitEngine.graph(os.path.join(ROOT, "README.md")) == [])
+
+    # 9) 集成到「分支」页签（真实窗口 + 后台任务链路）
+    from PySide6.QtCore import Qt as _QtCore
+    from PySide6.QtWidgets import QSplitter
+
+    app = QApplication.instance()
+    window = MainWindow()
+    window.resize(1360, 860)
+    window.show()
+    app.processEvents()
+    window.goto_key("repos")
+    window.repos_page._register_path(repo)
+    detail = window.repos_page.detail
+    deadline = time.time() + 25
+    while time.time() < deadline:
+        app.processEvents()
+        if detail.graph_view.row_count() > 0:
+            break
+        time.sleep(0.02)
+    app.processEvents()
+    check("分支页签包含提交演化图控件", hasattr(detail, "graph_view"))
+    check("切换仓库后自动填充提交图", detail.graph_view.row_count() >= 6,
+          str(detail.graph_view.row_count()))
+    branch_page = detail.tabs.widget(3)
+    check("分支页签仍是第 4 个页签", detail.tabs.tabText(3) == "分支", detail.tabs.tabText(3))
+    orientations = [s.orientation() for s in branch_page.findChildren(QSplitter)]
+    check("分支页签用垂直分隔器承载演化图",
+          _QtCore.Vertical in orientations, str(orientations))
+    check("演化图有刷新按钮", detail.btn_graph_refresh.text() == "刷新")
+    detail.graph_view.clear()
+    check("清空后不残留旧仓库提交", detail.graph_view.row_count() == 0)
+    detail.btn_graph_refresh.click()
+    deadline = time.time() + 25
+    while time.time() < deadline:
+        app.processEvents()
+        if detail.graph_view.row_count() > 0:
+            break
+        time.sleep(0.02)
+    app.processEvents()
+    check("点击刷新可重新读取提交图", detail.graph_view.row_count() >= 6,
+          str(detail.graph_view.row_count()))
+    # 收尾：把临时仓库从管理列表中移除，避免影响后续用例的仓库清单断言
+    detail.set_repo("")
+    window.repos_page.store.remove(repo)
+    window.repos_page.reload()
+    window.repos_page.shutdown()
+    window.close()
+    app.processEvents()
+
+
 def test_upload_cancel() -> None:
     """上传（推送 / 发布）可被「停止」中断。"""
     print("\n== 上传可停止 ==")
@@ -1446,6 +1889,7 @@ def main() -> int:
     test_network_and_details()
     test_upload_cancel()
     test_structure_tree()
+    test_commit_graph()
     test_ui(app)
     test_ui_layout(app)
     test_remote_multi(app)

@@ -547,6 +547,66 @@ def run_self_test(report_path: str | None = None) -> int:
         except Exception as exc:  # noqa: BLE001
             _record("传输详情面板可实例化并回填", False, f"{type(exc).__name__}: {exc}")
 
+        # 19.1 提交演化图（泳道布局算法 + 引擎数据源，全部离线）
+        try:
+            from .core.graph import layout_graph
+
+            linear_rows = layout_graph(
+                [
+                    {
+                        "sha": f"{index:040x}",
+                        "parents": [f"{index - 1:040x}"] if index > 1 else [],
+                    }
+                    for index in range(5, 0, -1)
+                ]
+            )
+            _record(
+                "提交图为线性历史时全部落在 0 号泳道",
+                len(linear_rows) == 5 and all(row.lane == 0 for row in linear_rows),
+                str([row.lane for row in linear_rows]),
+            )
+            fork_rows = layout_graph(
+                [
+                    {"sha": "m" * 40, "parents": ["d" * 40, "f" * 40], "refs": ["main", "HEAD"]},
+                    {"sha": "d" * 40, "parents": ["b" * 40]},
+                    {"sha": "f" * 40, "parents": ["b" * 40], "refs": ["feature"]},
+                    {"sha": "b" * 40, "parents": ["a" * 40]},
+                    {"sha": "a" * 40, "parents": []},
+                ]
+            )
+            _record(
+                "提交图可识别分叉与合并",
+                len({row.lane for row in fork_rows}) >= 2
+                and any(row.is_merge for row in fork_rows)
+                and any(
+                    connector["kind"] == "merge"
+                    for row in fork_rows
+                    for connector in row.connectors
+                ),
+                str([(row.lane, row.is_merge) for row in fork_rows]),
+            )
+            graph_items = GitEngine.graph(origin_dir)
+            _record(
+                "提交图数据源可读取当前仓库",
+                bool(graph_items) and all("sha" in item and "parents" in item for item in graph_items),
+                str(len(graph_items)),
+            )
+            # 父子倒挂的输入必须被拓扑校正（同一时间戳/时钟回拨场景的兜底）
+            flipped = layout_graph(
+                [
+                    {"sha": "a" * 40, "parents": []},
+                    {"sha": "b" * 40, "parents": ["a" * 40]},
+                    {"sha": "c" * 40, "parents": ["b" * 40]},
+                ]
+            )
+            _record(
+                "提交图可修正父子倒挂（子提交在前）",
+                [row.short for row in flipped] == ["c" * 8, "b" * 8, "a" * 8],
+                str([row.short for row in flipped]),
+            )
+        except Exception as exc:  # noqa: BLE001
+            _record("提交图布局可计算", False, f"{type(exc).__name__}: {exc}")
+
         # 20. 上传可停止（推送 / 发布）
         cancelled_token = engine.CancelToken()
         cancelled_token.cancel()

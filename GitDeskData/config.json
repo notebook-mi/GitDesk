@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "accounts": {
+    "github": {
+      "username": "",
+      "token": "",
+      "verified": false,
+      "display": ""
+    },
+    "gitee": {
+      "username": "",
+      "token": "",
+      "verified": false,
+      "display": ""
+    }
+  },
+  "settings": {
+    "clone_dir": "C:\\Users\\32721\\Documents\\GitDeskRepos",
+    "page_size": 30,
+    "watch_enabled": true,
+    "watch_interval_ms": 5000,
+    "proxy": "",
+    "git_username": "GitDesk",
+    "git_email": "gitdesk@localhost",
+    "window_geometry": "7,29,1280,820"
+  }
+}

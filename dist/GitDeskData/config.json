@@ -2,10 +2,10 @@
   "version": 1,
   "accounts": {
     "github": {
-      "username": "notebook-mi",
-      "token": "dpapi:AQAAANCMnd8BFdERjHoAwE/Cl+sBAAAATPUmc0K2oUikKp/QR0fa4gAAAAAQAAAARwBpAHQARABlAHMAawAAABBmAAAAAQAAIAAAAPX8IISHJVU6DqzPGc3Y0l6Pijtt+CRrtffAoUVww2kAAAAAAA6AAAAAAgAAIAAAAAwsLlDVy/+AHxtok4xH3wKDRXEXTSzdnZMZYS/dtPLwMAAAAHFK56F3RWuQZhMtFvZum+g3zOxuPVRIMaGdTZ3sCeY4DKkR4nfhytTxbjpNipOYMEAAAADDmrbJxzoHS+oaqkc3Hf2FbaaYn69h3iimwXbbgSPswtcmfwwO9KtGQ0c71Q3WKbWJKI5bP8/6iiAQKV25vbzj",
-      "verified": true,
-      "display": "notebook-mi"
+      "username": "",
+      "token": "",
+      "verified": false,
+      "display": ""
     },
     "gitee": {
       "username": "notebook-mi",
