@@ -288,6 +288,33 @@ def run_self_test(report_path: str | None = None) -> int:
         )
         _record("合并冲突后本地文件未被改动", merge_before == merge_after)
 
+        # 8.2 冲突解决流程（进入现场 → 标记解决 → 完成合并）
+        conflict_state = GitEngine.start_merge(merge_repo, "conflict-side")
+        _record(
+            "冲突合并进入待解决状态",
+            conflict_state.get("result") == "conflicts",
+            str(conflict_state.get("result")),
+        )
+        with open(os.path.join(merge_repo, "base.txt"), encoding="utf-8") as fh:
+            marked = fh.read()
+        _record("冲突文件写入标记", "<<<<<<<" in marked)
+        live = GitEngine.merge_state(merge_repo)
+        _record(
+            "可读取冲突文件清单",
+            bool(live.get("active")) and len(live.get("conflicts") or []) == 1,
+            str(live.get("conflicts")),
+        )
+        GitEngine.resolve_conflict(merge_repo, "base.txt", "已解决\n")
+        finished = GitEngine.finish_merge(
+            merge_repo, "合并 conflict-side", "SelfTest", "selftest@local"
+        )
+        _record(
+            "解决后可完成合并",
+            finished.get("result") == "merged"
+            and not os.path.exists(os.path.join(merge_repo, ".git", "MERGE_HEAD")),
+            str(finished.get("result")),
+        )
+
         # 9. 错误处理
         caught = None
         try:

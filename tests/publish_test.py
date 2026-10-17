@@ -11,6 +11,7 @@ from __future__ import annotations
 import os
 import sys
 import tempfile
+import time
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -345,33 +346,44 @@ def test_ui() -> None:
 
     # 主窗口入口
     from gitdesk.ui.main_window import MainWindow
+    from gitdesk.ui.pages.explore import ExplorePage
 
-    window = MainWindow()
-    window.show()
-    app.processEvents()
-    window.goto(1)
-    app.processEvents()
-    window.repos_page._register_path(empty_repo)
-    for _ in range(200):
+    # 测试不联网：MainWindow 切页时会 reload 远程仓库列表，
+    # 假令牌必然 401，_on_error 会弹模态框把测试卡死。
+    original_reload = ExplorePage.reload
+    ExplorePage.reload = lambda self: None          # type: ignore[assignment]
+    try:
+        window = MainWindow()
+        window.show()
         app.processEvents()
-        if not window.tasks.busy:
-            break
-        QTimer.singleShot(20, lambda: None)
-    app.processEvents()
-    detail = window.repos_page.detail
-    check("概览提供发布入口",
-          hasattr(detail, "btn_publish") and detail.btn_publish.isVisibleTo(detail)
-          and detail.btn_publish.isEnabled(),
-          f"exists={hasattr(detail, 'btn_publish')} "
-          f"visible={detail.btn_publish.isVisibleTo(detail)} "
-          f"enabled={detail.btn_publish.isEnabled()}")
-    check("远程页提供发布入口", hasattr(detail, "btn_remote_publish"))
-    detail._check_notice()
-    check("无远程时提示含发布入口引导",
-          detail.notice.isVisible() and "发布到远程仓库" in detail.notice.text(),
-          detail.notice.text())
-    check("详情面板暴露账号页跳转信号", hasattr(detail, "request_accounts"))
-    window.close()
+        window.goto(1)
+        app.processEvents()
+        window.repos_page._register_path(empty_repo)
+        detail = window.repos_page.detail
+        # 等待「刷新完成」：任务空闲且发布按钮恢复可用。
+        # 只看 tasks.busy 会在任务尚未启动的窗口期提前退出（按钮仍禁用，偶发失败）。
+        deadline = time.time() + 10
+        while time.time() < deadline:
+            app.processEvents()
+            if not window.tasks.busy and detail.btn_publish.isEnabled():
+                break
+            time.sleep(0.02)
+        app.processEvents()
+        check("概览提供发布入口",
+              hasattr(detail, "btn_publish") and detail.btn_publish.isVisibleTo(detail)
+              and detail.btn_publish.isEnabled(),
+              f"exists={hasattr(detail, 'btn_publish')} "
+              f"visible={detail.btn_publish.isVisibleTo(detail)} "
+              f"enabled={detail.btn_publish.isEnabled()}")
+        check("远程页提供发布入口", hasattr(detail, "btn_remote_publish"))
+        detail._check_notice()
+        check("无远程时提示含发布入口引导",
+              detail.notice.isVisible() and "发布到远程仓库" in detail.notice.text(),
+              detail.notice.text())
+        check("详情面板暴露账号页跳转信号", hasattr(detail, "request_accounts"))
+        window.close()
+    finally:
+        ExplorePage.reload = original_reload
 
 
 def main() -> int:

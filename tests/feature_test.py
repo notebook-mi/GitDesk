@@ -2027,9 +2027,9 @@ def test_merge_branch(app: QApplication) -> None:
     import gitdesk.ui.pages.repos as repos_module
 
     calls: list[tuple] = []
-    original_merge = _Engine.merge_branch
+    original_merge = _Engine.start_merge
     original_confirm = repos_module.confirm
-    _Engine.merge_branch = staticmethod(
+    _Engine.start_merge = staticmethod(
         lambda path, source, **kwargs: calls.append((source, kwargs))
         or {"result": "fast_forward", "source": f"refs/heads/{source}",
             "branch": "main", "advanced": 1, "conflicts": []}
@@ -2051,9 +2051,142 @@ def test_merge_branch(app: QApplication) -> None:
         check("合并完成给出快进提示",
               any("已快进合并" in m for m, _ in notices), str(notices[-2:]))
     finally:
-        _Engine.merge_branch = original_merge
+        _Engine.start_merge = original_merge
         repos_module.confirm = original_confirm
 
+    window.close()
+    app.processEvents()
+
+
+def test_merge_conflict(app: QApplication) -> None:
+    """冲突解决窗口：编辑、标记已解决、完成合并、中止合并。"""
+    print("\n== 合并冲突解决窗口 ==")
+    from PySide6.QtWidgets import QInputDialog
+
+    from gitdesk.core.gitengine import GitEngine as _Engine
+    from gitdesk.ui import merge_dialog as merge_ui
+
+    def conflict_repo(name: str) -> str:
+        repo = os.path.join(WORK, name)
+        git("init", "--initial-branch=main", repo)
+        git("config", "user.name", "Tester", cwd=repo)
+        git("config", "user.email", "tester@example.com", cwd=repo)
+
+        def commit(fname: str, text: str, msg: str) -> None:
+            with open(os.path.join(repo, fname), "w", encoding="utf-8") as fh:
+                fh.write(text)
+            git("add", "-A", cwd=repo)
+            git("commit", "-m", msg, cwd=repo)
+
+        commit("a.txt", "line1\ncommon\nline3\n", "m1")
+        git("checkout", "-b", "feature", cwd=repo)
+        commit("a.txt", "line1\nfeature\nline3\n", "f1")
+        commit("only-feature.txt", "feat\n", "f2")
+        git("checkout", "main", cwd=repo)
+        commit("a.txt", "line1\nmain\nline3\n", "m2")
+        return repo
+
+    # ---- 引擎：冲突现场 ----
+    repo = conflict_repo("conflict-flow")
+    result = _Engine.start_merge(repo, "feature")
+    check("冲突合并不再直接报错", result.get("result") == "conflicts", str(result))
+    check("冲突文件列表正确", result.get("conflicts") == ["a.txt"], str(result.get("conflicts")))
+    check("工作区写入冲突标记",
+          "<<<<<<<" in open(os.path.join(repo, "a.txt"), encoding="utf-8").read())
+    check("非冲突文件已合入", os.path.exists(os.path.join(repo, "only-feature.txt")))
+    check("冲突时不产生提交",
+          git("rev-parse", "HEAD", cwd=repo).stdout.strip()
+          == git("rev-parse", "main", cwd=repo).stdout.strip())
+
+    state = _Engine.merge_state(repo)
+    check("可读到合并现场", state.get("active") and len(state.get("conflicts") or []) == 1,
+          str(state))
+    check("现场能识别来源分支", "feature" in str(state.get("source")), str(state.get("source")))
+
+    data = _Engine.conflict_text(repo, "a.txt")
+    check("三方内容都能取到",
+          "main" in str(data.get("ours")) and "feature" in str(data.get("theirs"))
+          and "common" in str(data.get("base")), str(data)[:120])
+
+    # ---- 窗口：列表 / 编辑 / 标记 ----
+    dialog = merge_ui.MergeConflictDialog(None, repo)
+    check("窗口列出冲突文件", dialog.file_list.count() == 1, str(dialog.file_list.count()))
+    check("默认停在第一个冲突文件", dialog._current == "a.txt", dialog._current)
+    check("编辑器显示冲突标记", "<<<<<<<" in dialog.editor.toPlainText())
+    highlights = dialog.editor.extraSelections()
+    colors = {s.format.background().color().name() for s in highlights}
+    check("冲突块按三方着色", len(highlights) >= 3, str(len(highlights)))
+    check("高亮覆盖整行（零宽选区不渲染）",
+          bool(highlights) and all(s.cursor.hasSelection() for s in highlights))
+    check("我方/对方/标记三种底色齐全",
+          {"#eaf1fd", "#e6f4ea", "#fff3cd"} <= colors, str(colors))
+    check("未全部解决时不能完成合并", not dialog.btn_finish.isEnabled())
+
+    dialog.btn_ours.click()
+    app.processEvents()
+    check("使用我的版本后自动标记已解决", "a.txt" in dialog._resolved, str(dialog._resolved))
+    check("全部解决后可以完成合并", dialog.btn_finish.isEnabled())
+    check("解决后的文件可读",
+          "main" in open(os.path.join(repo, "a.txt"), encoding="utf-8").read())
+
+    emitted: list[str] = []
+    dialog.finished_with_result.connect(lambda r: emitted.append(r))
+    original_input = QInputDialog.getMultiLineText
+    QInputDialog.getMultiLineText = staticmethod(lambda *a, **k: ("合并 feature", True))
+    try:
+        dialog._finish()
+    finally:
+        QInputDialog.getMultiLineText = original_input
+    parents = git("log", "-1", "--format=%P", cwd=repo).stdout.split()
+    check("完成合并生成双父提交", len(parents) == 2, str(parents))
+    check("完成后清理 MERGE_HEAD",
+          not os.path.exists(os.path.join(repo, ".git", "MERGE_HEAD")))
+    check("完成后工作区干净", _Engine.status(repo).get("clean"))
+    check("窗口通知合并完成", emitted == ["merged"], str(emitted))
+
+    # ---- 中止合并：恢复现场且不留残文件 ----
+    repo2 = conflict_repo("conflict-abort")
+    head_before = git("rev-parse", "HEAD", cwd=repo2).stdout.strip()
+    _Engine.start_merge(repo2, "feature")
+    dialog2 = merge_ui.MergeConflictDialog(None, repo2)
+    original_confirm = merge_ui.confirm
+    merge_ui.confirm = lambda *a, **k: True
+    try:
+        dialog2._abort()
+    finally:
+        merge_ui.confirm = original_confirm
+    check("中止后清理 MERGE_HEAD",
+          not os.path.exists(os.path.join(repo2, ".git", "MERGE_HEAD")))
+    check("中止后 HEAD 未变",
+          git("rev-parse", "HEAD", cwd=repo2).stdout.strip() == head_before)
+    check("中止后文件恢复",
+          open(os.path.join(repo2, "a.txt"), encoding="utf-8").read() == "line1\nmain\nline3\n")
+    check("中止后工作区干净（不残留合并带入的文件）",
+          _Engine.status(repo2).get("clean"),
+          str(_Engine.status(repo2)))
+
+    # ---- 分支页：有未完成合并时直接打开窗口 ----
+    repo3 = conflict_repo("conflict-entry")
+    _Engine.start_merge(repo3, "feature")
+    window = MainWindow()
+    window.resize(1400, 900)
+    window.show()
+    app.processEvents()
+    window.goto_key("repos")
+    window.repos_page._register_path(repo3)
+    detail = window.repos_page.detail
+    deadline = time.time() + 25
+    while time.time() < deadline:
+        app.processEvents()
+        if (detail._status or {}).get("branch"):
+            break
+        time.sleep(0.02)
+    opened: list[int] = []
+    detail._open_conflict_dialog = lambda: opened.append(1)   # type: ignore[assignment]
+    detail._merge_selected_branch()
+    app.processEvents()
+    check("有未完成合并时直接打开解决窗口", opened == [1], str(opened))
+    _Engine.abort_merge(repo3)
     window.close()
     app.processEvents()
 
@@ -2091,6 +2224,7 @@ def main() -> int:
     test_remote_multi(app)
     test_sync_target(app)
     test_merge_branch(app)
+    test_merge_conflict(app)
     test_live(app)
     print("\n" + "=" * 60)
     print(f"通过 {len(PASS)} 项，失败 {len(FAIL)} 项")

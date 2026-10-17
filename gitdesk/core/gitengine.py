@@ -1706,6 +1706,287 @@ class GitEngine:
             }
 
     @staticmethod
+    def start_merge(
+        path: str,
+        source: str,
+        *,
+        message: str | None = None,
+        author: str = "GitDesk",
+        email: str = "gitdesk@localhost",
+    ) -> dict:
+        """执行合并；**遇到冲突不中止**，保留冲突现场供界面逐个解决。
+
+        与 :meth:`merge_branch` 的区别：这里不做「有冲突就阻止」的预检，
+        而是让 dulwich 真正把冲突写进工作区（带 ``<<<<<<<`` 标记）与索引
+        （stage 1/2/3），并留下 ``MERGE_HEAD``，之后可用
+        :meth:`finish_merge` / :meth:`abort_merge` 收尾。
+
+        返回的 ``result`` 可能是 ``up_to_date`` / ``already_merged`` /
+        ``fast_forward`` / ``merged`` / ``conflicts``。
+        冲突时 ``conflicts`` 为文件路径列表。
+        """
+        with _repo(path) as repo:
+            branch = porcelain.active_branch(repo)
+            if not branch:
+                raise GitError("当前处于游离 HEAD 状态，请先切换到具体分支后再合并。")
+            if os.path.exists(os.path.join(repo.controldir(), "MERGE_HEAD")):
+                raise GitError("已有一个未完成的合并，请先解决冲突或中止它。")
+
+            source_ref = _resolve_merge_source(repo, source)
+            if not source_ref:
+                raise GitError(f"找不到分支「{source}」，请刷新分支列表后重试。")
+
+            st = porcelain.status(repo, untracked_files="no")
+            staged_now = _normalize_staged(getattr(st, "staged", None))
+            unstaged_now = _normalize_paths(getattr(st, "unstaged", None))
+            if staged_now or unstaged_now:
+                raise GitError(
+                    "工作区存在未提交的更改，合并可能覆盖这些改动。\n"
+                    "请先提交或暂存（可使用「暂存当前更改」）后再合并。"
+                )
+
+            local_sha = repo.refs[b"refs/heads/" + branch]
+            source_sha = repo.refs[source_ref]
+            info = {"branch": _to_str(branch), "source": _to_str(source_ref)}
+            if local_sha == source_sha:
+                return {**info, "result": "up_to_date", "conflicts": []}
+
+            bases = porcelain.merge_base(repo, [local_sha, source_sha])
+            base = bases[0] if bases else None
+            if base is None:
+                raise GitError(
+                    f"「{_to_str(source_ref)}」与当前分支没有共同历史，无法合并。"
+                )
+            if base == source_sha:
+                return {**info, "result": "already_merged", "conflicts": []}
+            if base == local_sha:
+                advanced = _count_commits(repo, source_sha, local_sha)
+                repo.refs[b"refs/heads/" + branch] = source_sha
+                porcelain.reset(repo, "hard", treeish=source_sha)
+                return {
+                    **info,
+                    "result": "fast_forward",
+                    "advanced": advanced,
+                    "conflicts": [],
+                }
+
+            # 先把索引与工作区对齐到当前 HEAD：dulwich 的 update_working_tree
+            # 会比对索引 stat，索引不新鲜时会把干净工作区误判为「有本地改动」。
+            # 前面已确认工作区干净，所以这里 reset 是安全的。
+            porcelain.reset(repo, "hard", treeish=local_sha)
+
+            text = message or f"合并分支 {_to_str(source_ref)} 到 {_to_str(branch)}"
+            ident = f"{author} <{email}>".encode()
+            try:
+                merge_sha, conflicts = porcelain.merge(
+                    repo,
+                    source_sha,
+                    message=text.encode(),
+                    author=ident,
+                    committer=ident,
+                )
+            except Exception as exc:  # noqa: BLE001
+                _abort_merge(repo, local_sha)
+                msg, detail = humanize_error(exc)
+                raise GitError(f"合并失败，已回滚到操作前状态：{msg}", detail) from exc
+
+            if conflicts:
+                names = [_to_str(c) for c in conflicts]
+                log.info("合并产生 %d 个冲突文件，等待手动解决", len(names))
+                return {
+                    **info,
+                    "result": "conflicts",
+                    "conflicts": names,
+                    "message": text,
+                }
+            return {
+                **info,
+                "result": "merged",
+                "commit": merge_sha.decode()
+                if isinstance(merge_sha, bytes) and merge_sha
+                else "",
+                "conflicts": [],
+            }
+
+    @staticmethod
+    def merge_state(path: str) -> dict:
+        """读取未完成的合并现场（供冲突解决窗口使用）。"""
+        with _repo(path) as repo:
+            merge_head = os.path.join(repo.controldir(), "MERGE_HEAD")
+            if not os.path.exists(merge_head):
+                return {"active": False, "branch": "", "source": "", "message": "", "conflicts": []}
+            try:
+                branch = _to_str(porcelain.active_branch(repo))
+            except Exception:  # noqa: BLE001
+                branch = ""
+            their_sha = ""
+            try:
+                with open(merge_head, encoding="utf-8") as fh:
+                    their_sha = fh.read().strip()
+            except OSError:
+                pass
+            source = ""
+            if their_sha:
+                for name in _refs_at(repo, their_sha.encode()):
+                    if name.startswith(("refs/heads/", "refs/remotes/")):
+                        source = name
+                        break
+                if not source:
+                    source = their_sha[:8]
+            message = ""
+            msg_path = os.path.join(repo.controldir(), "MERGE_MSG")
+            if os.path.exists(msg_path):
+                try:
+                    with open(msg_path, encoding="utf-8", errors="replace") as fh:
+                        message = fh.read().strip()
+                except OSError:
+                    pass
+
+            index = repo.open_index()
+            pending = _conflicted_names(index)
+
+            conflicts = []
+            for name, slots in sorted(pending.items()):
+                full = os.path.join(path, name)
+                binary = False
+                try:
+                    with open(full, "rb") as fh:
+                        binary = b"\0" in fh.read(4096)
+                except OSError:
+                    binary = False
+                conflicts.append(
+                    {
+                        "path": name,
+                        "binary": binary,
+                        "ours": slots["ours"],
+                        "theirs": slots["theirs"],
+                        "base": slots["base"],
+                    }
+                )
+            return {
+                "active": True,
+                "branch": branch,
+                "source": source,
+                "message": message,
+                "conflicts": conflicts,
+            }
+
+    @staticmethod
+    def conflict_text(path: str, name: str) -> dict:
+        """取某个冲突文件的三方内容与工作区当前内容。"""
+        with _repo(path) as repo:
+            index = repo.open_index()
+            slots = _index_conflict_entries(index, name)
+            out: dict[str, object] = {
+                "path": name,
+                "current": "",
+                "ours": "",
+                "theirs": "",
+                "base": "",
+                "binary": False,
+            }
+            for slot in ("base", "ours", "theirs"):
+                entry = slots.get(slot)
+                if entry is None:
+                    continue
+                try:
+                    blob = repo[entry.sha]
+                    data = getattr(blob, "data", b"")
+                except KeyError:
+                    data = b""
+                out[slot] = data.decode("utf-8", "replace")
+                if b"\0" in data[:4096]:
+                    out["binary"] = True
+            full = os.path.join(path, name)
+            try:
+                with open(full, "rb") as fh:
+                    raw = fh.read()
+                out["binary"] = out["binary"] or b"\0" in raw[:4096]
+                out["current"] = raw.decode("utf-8", "replace")
+            except OSError:
+                out["current"] = ""
+            return out
+
+    @staticmethod
+    def resolve_conflict(path: str, name: str, content: str) -> None:
+        """把解决后的内容写回文件，并标记为已解决（等价 git add）。"""
+        full = os.path.join(path, name)
+        parent = os.path.dirname(full)
+        if parent:
+            os.makedirs(parent, exist_ok=True)
+        with open(full, "w", encoding="utf-8", newline="") as fh:
+            fh.write(content)
+        with _repo(path) as repo:
+            porcelain.add(repo, [full])
+            index = repo.open_index()
+            if _index_conflict_entries(index, name):
+                raise GitError(f"「{name}」仍标记为冲突，请重新保存后再试。")
+
+    @staticmethod
+    def finish_merge(
+        path: str,
+        message: str,
+        author: str = "GitDesk",
+        email: str = "gitdesk@localhost",
+    ) -> dict:
+        """所有冲突解决后创建合并提交，并清理合并现场。"""
+        with _repo(path) as repo:
+            merge_head = os.path.join(repo.controldir(), "MERGE_HEAD")
+            if not os.path.exists(merge_head):
+                raise GitError("当前没有进行中的合并。")
+            index = repo.open_index()
+            if index.has_conflicts():
+                raise GitError("还有未解决的冲突文件，无法完成合并。")
+            try:
+                with open(merge_head, encoding="utf-8") as fh:
+                    their_sha = fh.read().strip().encode()
+            except OSError as exc:
+                raise GitError(f"读取合并状态失败：{exc}") from exc
+
+            head_sha = repo.refs[b"HEAD"]
+            tree_id = index.commit(repo.object_store)
+            ts = int(time.time())
+            tz = -time.timezone if not time.daylight else -time.altzone
+            ident = f"{author} <{email}>".encode()
+            from dulwich.objects import Commit as _Commit
+
+            commit = _Commit()
+            commit.tree = tree_id
+            commit.parents = [head_sha, their_sha]
+            commit.author = ident
+            commit.committer = ident
+            commit.author_time = ts
+            commit.commit_time = ts
+            commit.author_timezone = tz
+            commit.commit_timezone = tz
+            commit.message = (message or f"合并分支 {their_sha.decode()[:8]}").encode()
+            repo.object_store.add_object(commit)
+            repo.refs[b"HEAD"] = commit.id
+            for stale in ("MERGE_HEAD", "MERGE_MSG"):
+                try:
+                    os.remove(os.path.join(repo.controldir(), stale))
+                except OSError:
+                    pass
+            log.info("合并完成：%s（冲突已全部解决）", commit.id.decode()[:8])
+            return {"result": "merged", "commit": commit.id.decode(), "conflicts": []}
+
+    @staticmethod
+    def abort_merge(path: str) -> None:
+        """放弃进行中的合并，工作区与索引恢复合并前状态。"""
+        with _repo(path) as repo:
+            merge_head = os.path.join(repo.controldir(), "MERGE_HEAD")
+            if not os.path.exists(merge_head):
+                raise GitError("当前没有进行中的合并。")
+            head_sha = repo.refs[b"HEAD"]
+            _abort_merge(repo, head_sha)
+            for stale in ("MERGE_HEAD", "MERGE_MSG"):
+                try:
+                    os.remove(os.path.join(repo.controldir(), stale))
+                except OSError:
+                    pass
+            log.info("已中止合并，工作区恢复到操作前状态")
+
+    @staticmethod
     def push(
         path: str,
         remote: str = "origin",
@@ -1922,13 +2203,35 @@ def _abort_merge(repo: Repo, commit_sha: bytes) -> None:
     冲突状态下索引含有未合并条目，dulwich 的 reset 无法直接使用，
     因此这里丢弃索引文件并按目标提交树重建，保证本地代码回到操作前状态。
     """
-    from dulwich.index import build_index_from_tree
+    from dulwich.index import build_index_from_tree, iter_tree_contents
 
     try:
         target = repo[commit_sha]
     except KeyError:
         log.error("回滚失败：找不到提交 %s", commit_sha)
         return
+
+    # 先删除「合并带进来、但目标提交里没有」的文件。
+    # 否则中止合并后，目标分支新增的文件会以未跟踪文件的形式残留在工作区。
+    try:
+        keep = {
+            entry.path
+            for entry in iter_tree_contents(repo.object_store, target.tree)
+        }
+        index = repo.open_index()
+        for key, _entry in list(index.items()):
+            path_bytes = key[0] if isinstance(key, tuple) else key
+            if path_bytes in keep:
+                continue
+            full = os.path.join(repo.path, path_bytes.decode("utf-8", "replace"))
+            try:
+                if os.path.isfile(full):
+                    os.remove(full)
+            except OSError as exc:
+                log.warning("清理合并残留文件失败 %s: %s", full, exc)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("清理合并残留文件时出错: %s", exc)
+
     index_path = os.path.join(repo.controldir(), "index")
     try:
         if os.path.exists(index_path):
@@ -1974,6 +2277,54 @@ def upstream_remote_name(upstream: str) -> str:
     """
     match = _UPSTREAM_REMOTE_RE.match(upstream or "")
     return match.group(1) if match else ""
+
+
+def _index_conflict_entries(index, name: str) -> dict[str, object]:
+    """取某路径在索引中的三方冲突条目（base/ours/theirs）。
+
+    dulwich 1.2.x 用 ``ConflictedIndexEntry`` 把三方塞进单个 (path, 0) 条目；
+    旧格式 / git CLI 写的是 (path, 1/2/3) 三条。两种都支持。
+    """
+    from dulwich.index import ConflictedIndexEntry
+
+    key_path = name.encode()
+    entries = dict(index.items())
+    out: dict[str, object] = {}
+    # 键可能是 bytes（当前 dulwich 的 items()）或 (path, 0)（旧格式/写入路径）
+    merged = entries.get((key_path, 0), entries.get(key_path))
+    if isinstance(merged, ConflictedIndexEntry):
+        if merged.ancestor is not None:
+            out["base"] = merged.ancestor
+        if merged.this is not None:
+            out["ours"] = merged.this
+        if merged.other is not None:
+            out["theirs"] = merged.other
+        return out
+    for stage, slot in ((1, "base"), (2, "ours"), (3, "theirs")):
+        entry = entries.get((key_path, stage))
+        if entry is not None:
+            out[slot] = entry
+    return out
+
+
+def _conflicted_names(index) -> dict[str, dict[str, bool]]:
+    """索引里所有仍有冲突的路径及其三方可用性。"""
+    from dulwich.index import ConflictedIndexEntry
+
+    out: dict[str, dict[str, bool]] = {}
+    for key, entry in index.items():
+        path_bytes, stage = key if isinstance(key, tuple) else (key, 0)
+        name = _to_str(path_bytes)
+        if isinstance(entry, ConflictedIndexEntry):
+            out[name] = {
+                "base": entry.ancestor is not None,
+                "ours": entry.this is not None,
+                "theirs": entry.other is not None,
+            }
+        elif stage:
+            slot = out.setdefault(name, {"base": False, "ours": False, "theirs": False})
+            slot["base" if stage == 1 else "ours" if stage == 2 else "theirs"] = True
+    return out
 
 
 def _resolve_merge_source(repo: Repo, source: str) -> bytes | None:

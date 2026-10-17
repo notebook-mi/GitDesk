@@ -83,6 +83,11 @@ Windows 桌面端 GitHub/Gitee 仓库管理器，交付单文件绿色 exe，内
   前置拦截三类：游离 HEAD、残留 `MERGE_HEAD`、工作区不干净。
   UI 取选中分支时按**焦点**决定先读本地表还是远程表（两张表各有 currentRow，不能固定优先级）。
   `porcelain.merge` 的 author/committer 是 bytes：`b"Name <email>"`
+- **冲突解决**：`start_merge()` 是「不阻止、留现场」，`merge_branch()` 是「有冲突就回滚」。
+  冲突条目在 dulwich 1.2.x 是 `ConflictedIndexEntry`（ancestor/this/other，放在 `(path,0)`），
+  `Index.items()` 的键可能是裸 `bytes`；调用 `porcelain.merge` 前必须 `reset --hard` 对齐索引 stat；
+  手动构造 `Commit` 的 `author_time/commit_time` 必须是 **int**。
+  窗口着色用 `ExtraSelection` 时 cursor 必须 `select(LineUnderCursor)`（零宽不渲染背景）。
 - 主题：`ui/style.py::apply_light_theme()` 把应用锁定为浅色（`QStyleHints.setColorScheme(Light)`）。
   原因：`QScrollArea.setWidget()` 会打开子控件 autoFillBackground，深色系统主题下会自绘成黑底；
   凡是「按调色板自绘背景」的控件都必须显式指定浅色背景

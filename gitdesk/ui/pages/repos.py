@@ -53,6 +53,7 @@ from ...core.publish import PublishPlan, publish_local
 from ...core.tree import filter_tree, format_size, list_dir, summarize
 from ..graphview import CommitGraphView
 from ..publish_dialog import PublishDialog
+from ..merge_dialog import MergeConflictDialog
 from ..widgets import (
     Badge,
     Card,
@@ -2249,9 +2250,19 @@ class RepoDetailPanel(QWidget):
         return ""
 
     def _merge_selected_branch(self) -> None:
-        """把选中的分支合并进当前分支。"""
+        """把选中的分支合并进当前分支；有冲突时打开解决窗口。"""
         if not self.path:
             return
+        # 上一次合并还没收尾：直接继续解决冲突
+        try:
+            state = GitEngine.merge_state(self.path)
+        except GitError:
+            state = {"active": False}
+        if state.get("active"):
+            self.notify.emit("检测到未完成的合并，正在打开冲突解决窗口…", "info")
+            self._open_conflict_dialog()
+            return
+
         name = self._selected_branch_name()
         if not name:
             self.notify.emit("请先在本地或远程分支列表中选择要合并的分支。", "info")
@@ -2269,7 +2280,7 @@ class RepoDetailPanel(QWidget):
             f"把「{name}」合并到当前分支「{current}」吗？\n\n"
             "· 能快进时直接快进（不产生合并提交）\n"
             f"· 否则创建合并提交「合并分支 {name} 到 {current}」\n"
-            "· 若存在冲突会自动中止并回滚，本地代码不受影响",
+            "· 若有冲突会打开解决窗口，可在里面逐个文件编辑（也可随时中止合并）",
         ):
             return
 
@@ -2279,11 +2290,43 @@ class RepoDetailPanel(QWidget):
         self._set_busy(True, f"正在合并 {name}…", indeterminate=True)
         log.info("合并分支 %s 到 %s", name, current)
         self.tasks.run(
-            lambda: GitEngine.merge_branch(path, name, author=author, email=email),
-            on_success=self._on_merge_done,
+            lambda: GitEngine.start_merge(path, name, author=author, email=email),
+            on_success=self._on_merge_result,
             on_error=self._on_action_error,
             label="合并分支",
         )
+
+    def _on_merge_result(self, result: dict) -> None:
+        self._set_busy(False)
+        if (result or {}).get("result") == "conflicts":
+            conflicts = result.get("conflicts") or []
+            self.notify.emit(
+                f"合并产生 {len(conflicts)} 个冲突文件，请逐个解决。", "warning"
+            )
+            log.info("合并冲突待解决：%s", conflicts)
+            self._open_conflict_dialog()
+            return
+        self._on_merge_done(result)
+
+    def _open_conflict_dialog(self) -> None:
+        if not self.path:
+            return
+        author = (self.cfg.get_setting("git_username", "") or "GitDesk").strip()
+        email = (self.cfg.get_setting("git_email", "") or "gitdesk@localhost").strip()
+        dialog = MergeConflictDialog(self, self.path, author=author, email=email)
+        dialog.finished_with_result.connect(self._on_conflict_closed)
+        dialog.exec()
+
+    def _on_conflict_closed(self, result: str) -> None:
+        self._set_busy(False)
+        if result == "merged":
+            self.notify.emit("冲突已全部解决，合并完成。", "success")
+        elif result == "aborted":
+            self.notify.emit("已中止合并，工作区恢复到合并前状态。", "info")
+        else:
+            self.notify.emit("已保存解决结果；仍有冲突时可再次点「合并到当前分支」继续。", "info")
+        self.refresh_all()
+        self.changed.emit()
 
     def _on_merge_done(self, result: dict) -> None:
         self._set_busy(False)
