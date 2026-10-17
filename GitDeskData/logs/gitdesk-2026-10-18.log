@@ -1,0 +1,4 @@
+2026-10-18 00:31:36,508 | INFO    | MainThread     | gitdesk | ==============================================================
+2026-10-18 00:31:36,508 | INFO    | MainThread     | gitdesk | GitDesk 启动，日志文件: D:\Git\GitDesk\GitDeskData\logs\gitdesk-2026-10-18.log
+2026-10-18 00:31:37,047 | INFO    | MainThread     | gitdesk.main | 界面已就绪
+2026-10-18 00:31:40,585 | INFO    | MainThread     | gitdesk.ui | GitDesk 退出

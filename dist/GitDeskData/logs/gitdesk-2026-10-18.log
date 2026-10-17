@@ -330,3 +330,28 @@ Python: 3.13.14  冻结: True
 2026-10-18 00:14:39,909 | DEBUG   | Dummy-34       | gitdesk.task | 任务开始: 变更检测
 2026-10-18 00:14:40,035 | DEBUG   | Dummy-34       | gitdesk.task | 任务完成: 变更检测
 2026-10-18 00:14:44,621 | INFO    | MainThread     | gitdesk.ui | GitDesk 退出
+2026-10-18 00:30:05,022 | INFO    | MainThread     | gitdesk | ==============================================================
+2026-10-18 00:30:05,022 | INFO    | MainThread     | gitdesk | GitDesk 启动，日志文件: D:\Git\GitDesk\dist\GitDeskData\logs\gitdesk-2026-10-18.log
+2026-10-18 00:30:05,498 | DEBUG   | MainThread     | gitdesk.ui.repos | 已开启变更监测: D:\Git\GitDesk
+2026-10-18 00:30:05,498 | DEBUG   | Dummy-1        | gitdesk.task | 任务开始: 刷新仓库状态
+2026-10-18 00:30:05,498 | DEBUG   | Dummy-2        | gitdesk.task | 任务开始: 读取分支列表
+2026-10-18 00:30:05,498 | DEBUG   | Dummy-3        | gitdesk.task | 任务开始: 读取提交历史
+2026-10-18 00:30:05,499 | DEBUG   | Dummy-4        | gitdesk.task | 任务开始: 读取提交图
+2026-10-18 00:30:05,499 | DEBUG   | Dummy-5        | gitdesk.task | 任务开始: 读取远程列表
+2026-10-18 00:30:05,499 | DEBUG   | Dummy-6        | gitdesk.task | 任务开始: 读取暂存列表
+2026-10-18 00:30:05,508 | DEBUG   | Dummy-5        | gitdesk.task | 任务完成: 读取远程列表
+2026-10-18 00:30:05,508 | DEBUG   | Dummy-6        | gitdesk.task | 任务完成: 读取暂存列表
+2026-10-18 00:30:05,618 | INFO    | MainThread     | gitdesk.main | 界面已就绪
+2026-10-18 00:30:05,635 | DEBUG   | Dummy-4        | gitdesk.task | 任务完成: 读取提交图
+2026-10-18 00:30:05,641 | DEBUG   | Dummy-2        | gitdesk.task | 任务完成: 读取分支列表
+2026-10-18 00:30:05,645 | DEBUG   | Dummy-3        | gitdesk.task | 任务完成: 读取提交历史
+2026-10-18 00:30:05,684 | DEBUG   | Dummy-1        | gitdesk.task | 任务完成: 刷新仓库状态
+2026-10-18 00:30:06,841 | DEBUG   | MainThread     | gitdesk.ui.repos | 已开启变更监测: D:\Git\GitDesk
+2026-10-18 00:30:08,525 | DEBUG   | MainThread     | gitdesk.ui.repos | 已开启变更监测: D:\Git\GitDesk
+2026-10-18 00:30:13,518 | DEBUG   | Dummy-7        | gitdesk.task | 任务开始: 变更检测
+2026-10-18 00:30:13,553 | DEBUG   | Dummy-7        | gitdesk.task | 任务完成: 变更检测
+2026-10-18 00:30:18,529 | DEBUG   | Dummy-8        | gitdesk.task | 任务开始: 变更检测
+2026-10-18 00:30:18,568 | DEBUG   | Dummy-8        | gitdesk.task | 任务完成: 变更检测
+2026-10-18 00:30:23,532 | DEBUG   | Dummy-9        | gitdesk.task | 任务开始: 变更检测
+2026-10-18 00:30:23,587 | DEBUG   | Dummy-9        | gitdesk.task | 任务完成: 变更检测
+2026-10-18 00:30:25,535 | INFO    | MainThread     | gitdesk.ui | GitDesk 退出
