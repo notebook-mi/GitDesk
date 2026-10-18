@@ -22,6 +22,10 @@
     "proxy": "",
     "git_username": "GitDesk",
     "git_email": "gitdesk@localhost",
+
     "window_geometry": "33,72,1280,820"
+
+    "window_geometry": "119,227,1280,820"
+
   }
 }

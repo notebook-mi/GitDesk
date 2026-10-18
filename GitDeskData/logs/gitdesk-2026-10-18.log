@@ -1,3 +1,4 @@
+
 2026-10-18 13:08:35,094 | INFO    | MainThread     | gitdesk | ==============================================================
 2026-10-18 13:08:35,094 | INFO    | MainThread     | gitdesk | GitDesk 启动，日志文件: D:\Git\GitDesk\GitDeskData\logs\gitdesk-2026-10-18.log
 2026-10-18 13:08:35,119 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 初始化仓库
@@ -125,7 +126,7 @@
 2026-10-18 13:08:36,045 | INFO    | MainThread     | gitdesk.selftest | GitDesk 自检报告
 时间: 2026-10-18 13:08:35
 Python: 3.13.14  冻结: True
-================================================================
+
   [PASS] 初始化仓库
   [PASS] 创建提交
   [PASS] 工作区状态读取
@@ -232,6 +233,11 @@ Python: 3.13.14  冻结: True
   [PASS] 非远程上游不解析远程名
   [PASS] 一致时徽标点名上游远程
   [PASS] 落后时徽标点名上游远程
-================================================================
+
 通过 106 项，失败 0 项，用时 0.95 秒
 2026-10-18 13:08:36,046 | INFO    | MainThread     | gitdesk.selftest | 报告已写入: C:/Users/32721/AppData/Local/Temp/st-a019aa.txt
+
+2026-10-18 00:31:36,508 | INFO    | MainThread     | gitdesk | ==============================================================
+2026-10-18 00:31:36,508 | INFO    | MainThread     | gitdesk | GitDesk 启动，日志文件: D:\Git\GitDesk\GitDeskData\logs\gitdesk-2026-10-18.log
+2026-10-18 00:31:37,047 | INFO    | MainThread     | gitdesk.main | 界面已就绪
+2026-10-18 00:31:40,585 | INFO    | MainThread     | gitdesk.ui | GitDesk 退出
