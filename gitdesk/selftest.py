@@ -68,6 +68,10 @@ def run_self_test(report_path: str | None = None) -> int:
     LINES.append("GitDesk 自检报告")
     LINES.append(f"时间: {time.strftime('%Y-%m-%d %H:%M:%S')}")
     LINES.append(f"Python: {sys.version.split()[0]}  冻结: {getattr(sys, 'frozen', False)}")
+    # 版本 + 可执行文件路径：排查「按钮/功能不见了」时，先看这里是不是最新包
+    from . import __version__
+
+    LINES.append(f"版本: {__version__}  可执行文件: {sys.executable}")
     LINES.append("=" * 64)
 
     work = tempfile.mkdtemp(prefix="gitdesk-selftest-")
@@ -314,6 +318,40 @@ def run_self_test(report_path: str | None = None) -> int:
             and not os.path.exists(os.path.join(merge_repo, ".git", "MERGE_HEAD")),
             str(finished.get("result")),
         )
+
+        # 8.3 删除远程分支（等价于 git push --delete）
+        GitEngine.create_branch(clone_dir, "selftest-remote-del")
+        GitEngine.push(clone_dir, "origin", "selftest-remote-del", Credential(), "github")
+        GitEngine.fetch(clone_dir, "origin")
+        remote_del_ref = os.path.join(
+            origin_dir, ".git", "refs", "heads", "selftest-remote-del"
+        )
+        _record("远程分支已推送到测试远程", os.path.isfile(remote_del_ref), remote_del_ref)
+        deleted = GitEngine.delete_remote_branch(clone_dir, "origin/selftest-remote-del")
+        _record(
+            "删除远程分支成功",
+            deleted.get("remote") == "origin"
+            and deleted.get("branch") == "selftest-remote-del"
+            and not os.path.isfile(remote_del_ref),
+            str(deleted.get("branch")),
+        )
+        tracking_left = [
+            b["name"]
+            for b in GitEngine.branches(clone_dir)["remote"]
+            if b["name"].endswith("selftest-remote-del")
+        ]
+        _record("本地远程跟踪引用已清理", not tracking_left, str(tracking_left))
+        caught = None
+        try:
+            GitEngine.delete_remote_branch(clone_dir, f"origin/{original_branch}")
+        except GitError as exc:
+            caught = exc
+        _record(
+            "远程默认分支拒绝删除",
+            caught is not None and "默认分支" in str(caught),
+            str(caught),
+        )
+        GitEngine.checkout(clone_dir, original_branch)
 
         # 9. 错误处理
         caught = None

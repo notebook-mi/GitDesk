@@ -1891,7 +1891,7 @@ def test_merge_branch(app: QApplication) -> None:
     commit(repo, "b.txt", "b\n", "f1")
     feature_sha = commit(repo, "b.txt", "b2\n", "f2")
     git("checkout", "main", cwd=repo)
-    result = _Engine.merge_branch(repo, "feature")
+    result = GitEngine.merge_branch(repo, "feature")
     check("能快进时直接快进", result.get("result") == "fast_forward", str(result))
     check("快进后当前分支指向源分支", head(repo) == feature_sha)
     check("快进报告前进提交数", result.get("advanced") == 2, str(result.get("advanced")))
@@ -1903,7 +1903,7 @@ def test_merge_branch(app: QApplication) -> None:
     commit(repo, "f.txt", "f\n", "f1")
     git("checkout", "main", cwd=repo)
     before_sha = commit(repo, "m.txt", "m\n", "m2")
-    result = _Engine.merge_branch(repo, "feature", author="Tester", email="tester@example.com")
+    result = GitEngine.merge_branch(repo, "feature", author="Tester", email="tester@example.com")
     parents = git("log", "-1", "--format=%P", cwd=repo).stdout.split()
     check("分叉时生成合并提交", result.get("result") == "merged", str(result))
     check("合并提交有两个父", len(parents) == 2, str(parents))
@@ -1912,7 +1912,7 @@ def test_merge_branch(app: QApplication) -> None:
           "合并分支" in git("log", "-1", "--format=%s", cwd=repo).stdout,
           git("log", "-1", "--format=%s", cwd=repo).stdout)
     check("重复合并返回已包含",
-          _Engine.merge_branch(repo, "feature").get("result") == "already_merged")
+          GitEngine.merge_branch(repo, "feature").get("result") == "already_merged")
 
     # ---- 冲突：必须回滚，且不动工作区 ----
     repo = make_repo("merge-conflict")
@@ -1924,7 +1924,7 @@ def test_merge_branch(app: QApplication) -> None:
     content_before = open(os.path.join(repo, "c.txt"), encoding="utf-8").read()
     error = ""
     try:
-        _Engine.merge_branch(repo, "feature")
+        GitEngine.merge_branch(repo, "feature")
     except GitError as exc:
         error = exc.message
     check("冲突时给出明确提示", "冲突" in error, error[:80])
@@ -1941,7 +1941,7 @@ def test_merge_branch(app: QApplication) -> None:
     hotfix_sha = commit(repo, "h.txt", "h\n", "h1")
     git("checkout", "main", cwd=repo)
     git("update-ref", "refs/remotes/origin/hotfix", hotfix_sha, cwd=repo)
-    result = _Engine.merge_branch(repo, "origin/hotfix")
+    result = GitEngine.merge_branch(repo, "origin/hotfix")
     check("可合并远程跟踪分支", result.get("result") == "fast_forward" and head(repo) == hotfix_sha,
           str(result))
 
@@ -1952,7 +1952,7 @@ def test_merge_branch(app: QApplication) -> None:
         fh.write("dirty\n")
     error = ""
     try:
-        _Engine.merge_branch(repo, "dirty-src")
+        GitEngine.merge_branch(repo, "dirty-src")
     except GitError as exc:
         error = exc.message
     check("工作区有改动时拒绝合并", "未提交" in error, error[:60])
@@ -1960,12 +1960,12 @@ def test_merge_branch(app: QApplication) -> None:
 
     error = ""
     try:
-        _Engine.merge_branch(repo, "no-such-branch")
+        GitEngine.merge_branch(repo, "no-such-branch")
     except GitError as exc:
         error = exc.message
     check("合并不存在的分支给出提示", "找不到" in error, error[:60])
     check("自己合并自己返回无需操作",
-          _Engine.merge_branch(repo, "main").get("result") == "up_to_date")
+          GitEngine.merge_branch(repo, "main").get("result") == "up_to_date")
 
     # ---- UI：分支页签入口 ----
     repo = os.path.join(WORK, "merge-ui")
@@ -2050,9 +2050,9 @@ def test_merge_branch(app: QApplication) -> None:
     import gitdesk.ui.pages.repos as repos_module
 
     calls: list[tuple] = []
-    original_merge = _Engine.start_merge
+    original_merge = GitEngine.start_merge
     original_confirm = repos_module.confirm
-    _Engine.start_merge = staticmethod(
+    GitEngine.start_merge = staticmethod(
         lambda path, source, **kwargs: calls.append((source, kwargs))
         or {"result": "fast_forward", "source": f"refs/heads/{source}",
             "branch": "main", "advanced": 1, "conflicts": []}
@@ -2074,7 +2074,7 @@ def test_merge_branch(app: QApplication) -> None:
         check("合并完成给出快进提示",
               any("已快进合并" in m for m, _ in notices), str(notices[-2:]))
     finally:
-        _Engine.start_merge = original_merge
+        GitEngine.start_merge = original_merge
         repos_module.confirm = original_confirm
 
     window.close()
@@ -2111,7 +2111,7 @@ def test_merge_conflict(app: QApplication) -> None:
 
     # ---- 引擎：冲突现场 ----
     repo = conflict_repo("conflict-flow")
-    result = _Engine.start_merge(repo, "feature")
+    result = GitEngine.start_merge(repo, "feature")
     check("冲突合并不再直接报错", result.get("result") == "conflicts", str(result))
     check("冲突文件列表正确", result.get("conflicts") == ["a.txt"], str(result.get("conflicts")))
     check("工作区写入冲突标记",
@@ -2121,12 +2121,12 @@ def test_merge_conflict(app: QApplication) -> None:
           git("rev-parse", "HEAD", cwd=repo).stdout.strip()
           == git("rev-parse", "main", cwd=repo).stdout.strip())
 
-    state = _Engine.merge_state(repo)
+    state = GitEngine.merge_state(repo)
     check("可读到合并现场", state.get("active") and len(state.get("conflicts") or []) == 1,
           str(state))
     check("现场能识别来源分支", "feature" in str(state.get("source")), str(state.get("source")))
 
-    data = _Engine.conflict_text(repo, "a.txt")
+    data = GitEngine.conflict_text(repo, "a.txt")
     check("三方内容都能取到",
           "main" in str(data.get("ours")) and "feature" in str(data.get("theirs"))
           and "common" in str(data.get("base")), str(data)[:120])
@@ -2164,13 +2164,13 @@ def test_merge_conflict(app: QApplication) -> None:
     check("完成合并生成双父提交", len(parents) == 2, str(parents))
     check("完成后清理 MERGE_HEAD",
           not os.path.exists(os.path.join(repo, ".git", "MERGE_HEAD")))
-    check("完成后工作区干净", _Engine.status(repo).get("clean"))
+    check("完成后工作区干净", GitEngine.status(repo).get("clean"))
     check("窗口通知合并完成", emitted == ["merged"], str(emitted))
 
     # ---- 中止合并：恢复现场且不留残文件 ----
     repo2 = conflict_repo("conflict-abort")
     head_before = git("rev-parse", "HEAD", cwd=repo2).stdout.strip()
-    _Engine.start_merge(repo2, "feature")
+    GitEngine.start_merge(repo2, "feature")
     dialog2 = merge_ui.MergeConflictDialog(None, repo2)
     original_confirm = merge_ui.confirm
     merge_ui.confirm = lambda *a, **k: True
@@ -2185,12 +2185,12 @@ def test_merge_conflict(app: QApplication) -> None:
     check("中止后文件恢复",
           open(os.path.join(repo2, "a.txt"), encoding="utf-8").read() == "line1\nmain\nline3\n")
     check("中止后工作区干净（不残留合并带入的文件）",
-          _Engine.status(repo2).get("clean"),
-          str(_Engine.status(repo2)))
+          GitEngine.status(repo2).get("clean"),
+          str(GitEngine.status(repo2)))
 
     # ---- 分支页：有未完成合并时直接打开窗口 ----
     repo3 = conflict_repo("conflict-entry")
-    _Engine.start_merge(repo3, "feature")
+    GitEngine.start_merge(repo3, "feature")
     window = MainWindow()
     window.resize(1400, 900)
     window.show()
@@ -2209,7 +2209,143 @@ def test_merge_conflict(app: QApplication) -> None:
     detail._merge_selected_branch()
     app.processEvents()
     check("有未完成合并时直接打开解决窗口", opened == [1], str(opened))
-    _Engine.abort_merge(repo3)
+    GitEngine.abort_merge(repo3)
+    window.close()
+    app.processEvents()
+
+
+def test_delete_remote_branch(app: QApplication) -> None:
+    """删除远程分支：引擎真实删除 + 界面按选中位置分派。"""
+    import gitdesk.ui.pages.repos as repos_module
+
+    print("\n== 删除远程分支 ==")
+    base = os.path.join(WORK, "del-remote")
+    bare = os.path.join(base, "remote.git")
+    repo = os.path.join(base, "repo")
+    os.makedirs(base, exist_ok=True)
+    git("init", "--bare", "--initial-branch=main", bare)
+    git("clone", bare, repo)
+    git("config", "user.name", "Tester", cwd=repo)
+    git("config", "user.email", "tester@example.com", cwd=repo)
+    with open(os.path.join(repo, "a.txt"), "w", encoding="utf-8") as fh:
+        fh.write("a\n")
+    git("add", "-A", cwd=repo)
+    git("commit", "-m", "init", cwd=repo)
+    git("push", "-u", "origin", "main", cwd=repo)
+    git("branch", "feature/x", cwd=repo)
+    git("push", "origin", "feature/x", cwd=repo)
+    git("branch", "feature/y", cwd=repo)
+    git("push", "origin", "feature/y", cwd=repo)
+    git("remote", "add", "ori", bare, cwd=repo)
+    git("fetch", "origin", cwd=repo)
+
+    check("远程跟踪引用可拆出远程与分支",
+          GitEngine.split_remote_ref(repo, "origin/feature/x") == ("origin", "feature/x"),
+          str(GitEngine.split_remote_ref(repo, "origin/feature/x")))
+    check("远程名按最长匹配（ori 不抢 origin）",
+          GitEngine.split_remote_ref(repo, "origin/feature/x")[0] == "origin")
+    check("无关前缀不误判远程",
+          GitEngine.split_remote_ref(repo, "nowhere/x") == ("", ""))
+    check("可查询远程默认分支",
+          GitEngine.remote_default_branch(repo, "origin") == "main",
+          GitEngine.remote_default_branch(repo, "origin"))
+
+    result = GitEngine.delete_remote_branch(repo, "origin/feature/x")
+    check("删除远程分支返回远程与分支名",
+          result.get("remote") == "origin" and result.get("branch") == "feature/x",
+          str(result))
+    remote_branches = git("branch", "--list", cwd=bare).stdout
+    check("远程仓库上该分支已消失", "feature/x" not in remote_branches,
+          remote_branches.replace("\n", " | "))
+    check("同远程其它分支不受影响", "feature/y" in remote_branches,
+          remote_branches.replace("\n", " | "))
+    local_refs = git("for-each-ref", "--format=%(refname)", cwd=repo).stdout
+    check("本地远程跟踪引用同步清理",
+          "refs/remotes/origin/feature/x" not in local_refs)
+
+    error = ""
+    try:
+        GitEngine.delete_remote_branch(repo, "origin/main")
+    except GitError as exc:
+        error = exc.message
+    check("默认分支拒绝删除", "默认分支" in error, error[:70])
+
+    error = ""
+    try:
+        GitEngine.delete_remote_branch(repo, "origin/gone")
+    except GitError as exc:
+        error = exc.message
+    check("本地已不存在的远程分支给出提示", "刷新" in error or "不存在" in error, error[:70])
+
+    error = ""
+    try:
+        GitEngine.delete_remote_branch(repo, "nowhere/x")
+    except GitError as exc:
+        error = exc.message
+    check("无法识别远程时给出提示", "无法识别" in error, error[:70])
+
+    # ---- UI：选中远程分支后点「删除分支」走远程删除 ----
+    repos_module.confirm = lambda *a, **k: True
+    repos_module.show_error = lambda *a, **k: None
+    window = MainWindow()
+    window.resize(1400, 900)
+    window.show()
+    app.processEvents()
+    window.goto_key("repos")
+    window.repos_page._register_path(repo)
+    detail = window.repos_page.detail
+    detail.cfg.token = lambda platform: "test-token"
+    deadline = time.time() + 25
+    while time.time() < deadline:
+        app.processEvents()
+        if detail.remote_table.rowCount() >= 2:
+            break
+        time.sleep(0.02)
+    app.processEvents()
+
+    def remote_row(name: str) -> int:
+        for r in range(detail.remote_table.rowCount()):
+            item = detail.remote_table.item(r, 0)
+            if item and item.text().strip() == name:
+                return r
+        return -1
+
+    row = remote_row("origin/feature/y")
+    check("远程分支列表含 origin/feature/y", row >= 0, str(detail.remote_table.rowCount()))
+    detail.remote_table.setCurrentCell(row, 0)
+    detail._branch_source = "remote"
+    check("选中远程分支时识别为远程",
+          detail._selected_branch() == ("remote", "origin/feature/y"),
+          str(detail._selected_branch()))
+
+    notices: list[tuple] = []
+    detail.notify.connect(lambda message, level="info": notices.append((message, level)))
+    detail._delete_branch()
+    deadline = time.time() + 25
+    while time.time() < deadline:
+        app.processEvents()
+        if not window.tasks.busy and notices:
+            break
+        time.sleep(0.02)
+    app.processEvents()
+    check("界面删除远程分支后提示成功",
+          any("已删除远程分支" in m for m, _ in notices), str(notices[-2:]))
+    remote_branches = git("branch", "--list", cwd=bare).stdout
+    check("界面操作确实删掉了远程分支", "feature/y" not in remote_branches,
+          remote_branches.replace("\n", " | "))
+
+    # 选中本地分支时仍然只删本地
+    local_row = -1
+    for r in range(detail.local_table.rowCount()):
+        item = detail.local_table.item(r, 0)
+        if item and item.text().replace("★ ", "").strip() == "feature/x":
+            local_row = r
+            break
+    check("本地分支列表含 feature/x", local_row >= 0, str(detail.local_table.rowCount()))
+    detail.local_table.setCurrentCell(local_row, 0)
+    detail._branch_source = "local"
+    check("选中本地分支时识别为本地",
+          detail._selected_branch() == ("local", "feature/x"), str(detail._selected_branch()))
     window.close()
     app.processEvents()
 
@@ -2248,6 +2384,7 @@ def main() -> int:
     test_sync_target(app)
     test_merge_branch(app)
     test_merge_conflict(app)
+    test_delete_remote_branch(app)
     test_live(app)
     print("\n" + "=" * 60)
     print(f"通过 {len(PASS)} 项，失败 {len(FAIL)} 项")

@@ -96,6 +96,17 @@ def setup_logging(level: int = logging.INFO) -> logging.Logger:
     _configured = True
     logger.info("=" * 62)
     logger.info("GitDesk 启动，日志文件: %s", log_path)
+    try:
+        from .. import __version__
+
+        logger.info(
+            "版本 %s | 可执行文件: %s | 冻结: %s",
+            __version__,
+            sys.executable,
+            bool(getattr(sys, "frozen", False)),
+        )
+    except Exception:
+        pass
     return logger
 
 

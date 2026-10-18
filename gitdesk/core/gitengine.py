@@ -1096,6 +1096,168 @@ class GitEngine:
                 raise GitError(msg, detail) from exc
 
     @staticmethod
+    def split_remote_ref(path: str, tracking: str) -> tuple[str, str]:
+        """把远程跟踪引用名拆成 ``(远程名, 分支名)``，如 ``("origin", "feature/x")``。
+
+        远程名本身允许带斜杠（``my/remote``），因此按名字长度从长到短匹配，
+        避免 ``ori`` 抢走 ``origin/...``。
+        """
+        name = _to_str(tracking).strip().strip("/")
+        if not name:
+            return "", ""
+        try:
+            remotes = GitEngine.remotes(path)
+        except GitError:
+            return "", ""
+        for remote in sorted(remotes, key=lambda r: len(r["name"]), reverse=True):
+            prefix = remote["name"] + "/"
+            if name.startswith(prefix) and len(name) > len(prefix):
+                return remote["name"], name[len(prefix):]
+        return "", ""
+
+    @staticmethod
+    def remote_default_branch(
+        path: str,
+        remote: str,
+        *,
+        credential: Credential | None = None,
+        platform: str = "github",
+    ) -> str:
+        """查询远程的默认分支名（远程 HEAD 这个符号引用指向的分支）。
+
+        查不到（离线 / 无权限 / 本地文件远程）时返回空串，调用方按「未知」处理。
+        """
+        credential = credential or Credential()
+        url = ""
+        try:
+            for item in GitEngine.remotes(path):
+                if item.get("name") == remote:
+                    url = item.get("url", "")
+                    break
+        except GitError:
+            return ""
+        if not url:
+            return ""
+        user, pwd = credential.basic_auth(platform)
+        try:
+            result = porcelain.ls_remote(url, username=user, password=pwd)
+        except Exception:  # noqa: BLE001 - 只是护栏探测，失败不应阻断删除
+            log.debug("查询远程 %s 的默认分支失败", remote, exc_info=True)
+            return ""
+        symrefs = getattr(result, "symrefs", None) or {}
+        target = _to_str(symrefs.get(b"HEAD") or symrefs.get("HEAD") or "")
+        prefix = "refs/heads/"
+        return target[len(prefix):] if target.startswith(prefix) else ""
+
+    @staticmethod
+    def delete_remote_branch(
+        path: str,
+        tracking: str,
+        *,
+        credential: Credential | None = None,
+        platform: str = "github",
+        progress: ProgressCb | None = None,
+        detail: Callable[[dict], None] | None = None,
+        cancel: CancelToken | None = None,
+    ) -> dict:
+        """删除远程仓库上的分支（等价于 ``git push <remote> --delete <branch>``）。
+
+        ``tracking`` 是本地看到的远程跟踪引用名，如 ``origin/feature/x``。
+        成功后一并删掉本地 ``refs/remotes/<remote>/<branch>``，界面立刻少一行。
+        """
+        credential = credential or Credential()
+        remote, branch = GitEngine.split_remote_ref(path, tracking)
+        if not remote or not branch:
+            raise GitError(
+                f"无法识别远程分支 {tracking or '（空）'} 属于哪个远程仓库。\n"
+                "请确认它形如 origin/分支名，且该远程仍配置在「远程」标签页里。"
+            )
+        user, pwd = credential.basic_auth(platform)
+        tracking_ref = b"refs/remotes/" + tracking.encode()
+        head_ref = b"refs/remotes/" + remote.encode() + b"/HEAD"
+        with _repo(path) as repo:
+            refs = repo.get_refs()
+            if tracking_ref not in refs:
+                raise GitError(
+                    f"远程分支 {tracking} 在本地已不存在（可能已被删除）。\n请先点「刷新」再试。"
+                )
+            try:
+                head_target = repo.refs.read_loose_ref(head_ref) or b""
+            except Exception:
+                head_target = b""
+            if head_target == tracking_ref:
+                raise GitError(
+                    f"{tracking} 是远程 {remote} 的默认分支，不能在客户端删除。\n"
+                    "如需更换默认分支，请先到代码托管平台调整默认分支设置。"
+                )
+        # 远程 HEAD 更权威（本地没 fetch 过 HEAD 时靠它兜底）
+        default_branch = GitEngine.remote_default_branch(
+            path, remote, credential=credential, platform=platform
+        )
+        if default_branch and default_branch == branch:
+            raise GitError(
+                f"{tracking} 是远程 {remote} 的默认分支，不能在客户端删除。\n"
+                "如需更换默认分支，请先到代码托管平台调整默认分支设置。"
+            )
+        monitor = _monitor_for("push", progress, detail, cancel)
+        if cancel is not None and cancel.cancelled:
+            _finish_monitor(monitor, False, "已停止删除")
+            raise CancelledError("已停止删除远程分支。")
+        if monitor is not None:
+            monitor.set_phase("连接远程", f"正在从 {remote} 删除分支 {branch}…")
+        try:
+            result = _retry_network(
+                lambda: porcelain.push(
+                    path,
+                    remote,
+                    b"refs/heads/" + branch.encode(),
+                    username=user,
+                    password=pwd,
+                    delete=True,
+                    **_monitor_kwargs(monitor),
+                ),
+                monitor=monitor,
+                label=f"删除远程分支 {branch}",
+                cancel=cancel,
+            )
+        except _Cancelled as exc:
+            _finish_monitor(monitor, False, "已停止删除")
+            raise CancelledError("已停止删除远程分支。") from exc
+        except Exception as exc:  # noqa: BLE001
+            _finish_monitor(monitor, False)
+            if isinstance(exc, CancelledError) or (cancel is not None and cancel.cancelled):
+                raise CancelledError("已停止删除远程分支。") from exc
+            msg, dt = humanize_error(exc, retried=_retries(monitor))
+            raise GitError(f"删除远程分支失败：{msg}", dt) from exc
+        raw_refs = getattr(result, "refs", None) or {}
+        refs_out = (
+            {_to_str(k): _to_str(v) for k, v in raw_refs.items()}
+            if isinstance(raw_refs, dict)
+            else {}
+        )
+        rejects = [
+            v for v in refs_out.values() if "reject" in v.lower() or "error" in v.lower()
+        ]
+        if rejects:
+            _finish_monitor(monitor, False)
+            raise GitError("远程拒绝删除该分支：\n" + "\n".join(rejects))
+        # 本地同步：清掉远程跟踪引用，避免列表里留一个已经不存在的分支
+        try:
+            with _repo(path) as repo:
+                current = repo.get_refs()
+                if tracking_ref in current:
+                    repo.refs.remove_if_equals(tracking_ref, current[tracking_ref])
+        except Exception:  # noqa: BLE001 - 引用清理失败不影响远程已删除的事实
+            log.debug("清理远程跟踪引用失败：%s", tracking, exc_info=True)
+        _finish_monitor(monitor, True, f"远程分支 {branch} 已删除")
+        return {
+            "remote": remote,
+            "branch": branch,
+            "tracking": tracking,
+            "refs": refs_out,
+        }
+
+    @staticmethod
     def rename_branch(path: str, old: str, new: str) -> None:
         with _repo(path) as repo:
             try:

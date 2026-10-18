@@ -356,6 +356,8 @@ class RepoDetailPanel(QWidget):
         layout = QVBoxLayout(page)
         layout.setContentsMargins(14, 14, 14, 14)
         layout.setSpacing(10)
+        # 用户最后在哪张分支表里做过选择（点击按钮后焦点会移走，用它兜底）
+        self._branch_source = "local"
 
         bar = QHBoxLayout()
         bar.setSpacing(8)
@@ -371,6 +373,10 @@ class RepoDetailPanel(QWidget):
         self.btn_branch_new = QPushButton("新建分支")
         self.btn_branch_new.clicked.connect(self._new_branch)
         self.btn_branch_del = QPushButton("删除分支")
+        self.btn_branch_del.setToolTip(
+            "删除选中的分支：选中的是本地分支就删本地，选中的是远程分支"
+            "（如 origin/feature）就删除远程仓库上的该分支（需要访问令牌）"
+        )
         self.btn_branch_del.setProperty("variant", "danger")
         self.btn_branch_del.clicked.connect(self._delete_branch)
         self.btn_branch_pull = QPushButton("拉取远程分支")
@@ -400,6 +406,7 @@ class RepoDetailPanel(QWidget):
         lh.setSectionResizeMode(0, QHeaderView.Stretch)
         for i in (1, 2, 3):
             lh.setSectionResizeMode(i, QHeaderView.ResizeToContents)
+        self.local_table.itemSelectionChanged.connect(self._on_local_selection)
         lv.addWidget(self.local_table)
         splitter.addWidget(left)
 
@@ -407,6 +414,10 @@ class RepoDetailPanel(QWidget):
         rv = QVBoxLayout(right)
         rv.setContentsMargins(0, 0, 0, 0)
         rv.addWidget(_section_label("远程分支"))
+        remote_hint = QLabel("选中远程分支后点「删除分支」，会直接删除远程仓库上的该分支。")
+        remote_hint.setObjectName("Faint")
+        remote_hint.setWordWrap(True)
+        rv.addWidget(remote_hint)
         self.remote_table = QTableWidget(0, 2)
         self.remote_table.setHorizontalHeaderLabels(["分支", "提交"])
         self.remote_table.verticalHeader().setVisible(False)
@@ -417,6 +428,7 @@ class RepoDetailPanel(QWidget):
         rh = self.remote_table.horizontalHeader()
         rh.setSectionResizeMode(0, QHeaderView.Stretch)
         rh.setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        self.remote_table.itemSelectionChanged.connect(self._on_remote_selection)
         rv.addWidget(self.remote_table)
         splitter.addWidget(right)
         splitter.setStretchFactor(0, 3)
@@ -2233,21 +2245,37 @@ class RepoDetailPanel(QWidget):
             "新建分支",
         )
 
-    def _selected_branch_name(self) -> str:
-        """当前选中的分支名（优先最近操作的表格：本地 / 远程）。"""
-        tables = (
-            (self.remote_table, self.local_table)
-            if self.remote_table.hasFocus()
-            else (self.local_table, self.remote_table)
+    def _on_local_selection(self) -> None:
+        if self.local_table.hasFocus():
+            self._branch_source = "local"
+
+    def _on_remote_selection(self) -> None:
+        if self.remote_table.hasFocus():
+            self._branch_source = "remote"
+
+    def _selected_branch(self) -> tuple[str, str]:
+        """当前选中的分支：(类型, 分支名)，类型为 ``local`` / ``remote`` / 空串。
+
+        优先读用户最后操作的那张表，避免另一张表的残留 currentRow 抢答
+        （点「删除分支」按钮时焦点已经离开表格，不能只看 hasFocus）。
+        """
+        order = (
+            ((self.remote_table, "remote"), (self.local_table, "local"))
+            if getattr(self, "_branch_source", "local") == "remote"
+            else ((self.local_table, "local"), (self.remote_table, "remote"))
         )
-        for table in tables:
+        for table, kind in order:
             row = table.currentRow()
             if row < 0:
                 continue
             item = table.item(row, 0)
             if item is not None and item.text().strip():
-                return item.text().replace("★ ", "").strip()
-        return ""
+                return kind, item.text().replace("★ ", "").strip()
+        return "", ""
+
+    def _selected_branch_name(self) -> str:
+        """当前选中的分支名（优先最近操作的表格：本地 / 远程）。"""
+        return self._selected_branch()[1]
 
     def _merge_selected_branch(self) -> None:
         """把选中的分支合并进当前分支；有冲突时打开解决窗口。"""
@@ -2352,18 +2380,92 @@ class RepoDetailPanel(QWidget):
         self.changed.emit()
 
     def _delete_branch(self) -> None:
-        row = self.local_table.currentRow()
-        if row < 0:
-            self.notify.emit("请先选择要删除的分支。", "info")
+        if not self.path:
             return
-        item = self.local_table.item(row, 0)
-        if not item:
+        kind, name = self._selected_branch()
+        if not name:
+            self.notify.emit("请先选择要删除的分支（本地或远程都可以）。", "info")
             return
-        name = item.text().replace("★ ", "")
+        if kind == "remote":
+            self._delete_remote_branch(name)
+            return
         if not confirm(self, "删除分支", f"确定删除本地分支 {name} 吗？该分支未合并的提交将无法通过分支找回。", danger=True):
             return
         path = self.path
         self._run_simple(lambda: GitEngine.delete_branch(path, name), f"已删除分支 {name}", "删除分支")
+
+    def _delete_remote_branch(self, tracking: str) -> None:
+        """删除远程仓库上的分支（如选中了 origin/feature）。"""
+        if not self.path:
+            return
+        remote, branch = GitEngine.split_remote_ref(self.path, tracking)
+        if not remote:
+            self.notify.emit(f"没能识别 {tracking} 属于哪个远程，请先点「刷新」重试。", "info")
+            return
+        known = {r["name"]: r for r in GitEngine.remotes(self.path)}
+        url = (known.get(remote) or {}).get("url", "")
+        platform = self._guess_platform(url)
+        if not confirm(
+            self,
+            "删除远程分支",
+            f"将从远程仓库 {remote} 上删除分支 {branch}。\n\n"
+            "这是对远程仓库的写操作，所有协作者都会立即受到影响，删除后无法从本机恢复。\n"
+            f"确定继续吗？\n\n（默认分支不允许删除）",
+            danger=True,
+        ):
+            return
+        token = self.cfg.token(platform)
+        if not token:
+            label = platapi.PLATFORMS.get(platform, platapi.PLATFORMS["github"]).label
+            show_error(
+                self,
+                "缺少访问令牌",
+                f"删除远程分支需要 {label} 的访问令牌，请先到「账号设置」完成配置。",
+            )
+            return
+        credential = Credential(self.cfg.username(platform), token)
+        path = self.path
+
+        def job(progress=None, detail=None, cancel=None):
+            return GitEngine.delete_remote_branch(
+                path,
+                tracking,
+                credential=credential,
+                platform=platform,
+                progress=progress,
+                detail=detail,
+                cancel=cancel,
+            )
+
+        self._set_busy(
+            True,
+            f"正在删除远程分支 {tracking}…",
+            indeterminate=True,
+            kind="上传 · 删除分支",
+            cancellable=True,
+        )
+        self._upload_task = self.tasks.run(
+            job,
+            on_progress=self._progress_to_panel,
+            on_detail=self._on_detail,
+            on_success=self._on_remote_branch_deleted,
+            on_error=self._on_action_error,
+            on_cancelled=self._on_upload_stopped,
+            label="删除远程分支",
+        )
+
+    def _on_remote_branch_deleted(self, payload) -> None:
+        self._upload_task = None
+        data = payload if isinstance(payload, dict) else {}
+        remote = data.get("remote", "")
+        branch = data.get("branch", "")
+        message = f"已删除远程分支 {remote}/{branch}" if remote else "远程分支已删除"
+        self.transfer.finish(message, ok=True)
+        self._set_busy(False)
+        self.notify.emit(f"{message}。", "success")
+        log.info(message)
+        self.refresh_all()
+        self.changed.emit()
 
     def _add_remote(self) -> None:
         if not self.path:
