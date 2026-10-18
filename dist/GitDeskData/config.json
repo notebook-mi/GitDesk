@@ -2,10 +2,10 @@
   "version": 1,
   "accounts": {
     "github": {
-      "username": "",
-      "token": "",
-      "verified": false,
-      "display": ""
+      "username": "notebook-mi",
+      "token": "dpapi:AQAAANCMnd8BFdERjHoAwE/Cl+sBAAAATPUmc0K2oUikKp/QR0fa4gAAAAAQAAAARwBpAHQARABlAHMAawAAABBmAAAAAQAAIAAAAL3vXuYx/JDMSbJsKjgFSFgh1i2aT2is8l8iWdiVYY7pAAAAAA6AAAAAAgAAIAAAAGqz7AYRhDWiSgbnwknnXAbqpLFGhrwKFI+KFvGhsROTMAAAAODyLn3pTXmOHOP0SKI93V7Cy+O6DfkfBPwppvpJGvdH9S/lMRhxAXGrRw/rXBvcikAAAABGIdcwJntMnJJPRuyBpJLwGuWJTnO0bjovIOH9UKK/KGvfCJVM0gh/A2GLbCHirMevttqmjrPcMKXgd3dYHjRz",
+      "verified": true,
+      "display": "notebook-mi"
     },
     "gitee": {
       "username": "notebook-mi",
@@ -22,6 +22,6 @@
     "proxy": "",
     "git_username": "GitDesk",
     "git_email": "gitdesk@localhost",
-    "window_geometry": "221,61,1280,820"
+    "window_geometry": "33,72,1280,820"
   }
 }

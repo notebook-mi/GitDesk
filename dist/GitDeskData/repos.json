@@ -7,7 +7,7 @@
     "remote_url": "https://github.com/notebook-mi/GitDesk.git",
     "full_name": "notebook-mi/GitDesk",
     "source": "import",
-    "last_sync": "2026-10-18 00:14:31",
+    "last_sync": "2026-10-18 13:15:49",
     "remote": "origin"
   },
   {
@@ -18,7 +18,7 @@
     "remote_url": "https://github.com/notebook-mi/AIP-Studio.git",
     "full_name": "notebook-mi/AIP-Studio",
     "source": "import",
-    "last_sync": "2026-10-12 19:54:12",
+    "last_sync": "2026-10-18 13:00:44",
     "remote": "origin"
   },
   {
@@ -30,6 +30,37 @@
     "full_name": "notebook-mi/photoWeb",
     "source": "import",
     "remote": "origin",
-    "last_sync": "2026-10-12 20:51:30"
+    "last_sync": "2026-10-12 21:14:00"
+  },
+  {
+    "path": "D:\\Git\\11",
+    "name": "11",
+    "added_at": "2026-10-12 22:30:32",
+    "platform": "github",
+    "remote_url": "https://github.com/notebook-mi/11.git",
+    "full_name": "notebook-mi/11",
+    "source": "import",
+    "remote": "origin",
+    "last_sync": "2026-10-12 22:30:50"
+  },
+  {
+    "path": "D:\\Git\\知识库",
+    "name": "知识库",
+    "added_at": "2026-10-14 17:39:16",
+    "platform": "gitee",
+    "remote_url": "https://gitee.com/notebook-mi/knowledgeBase.git",
+    "full_name": "notebook-mi/knowledgeBase",
+    "source": "import",
+    "remote": "origin",
+    "last_sync": "2026-10-14 17:45:26"
+  },
+  {
+    "path": "D:\\Git\\123",
+    "name": "123",
+    "added_at": "2026-10-16 21:33:45",
+    "platform": "github",
+    "remote_url": "",
+    "full_name": "",
+    "source": "import"
   }
 ]

@@ -1,0 +1,237 @@
+2026-10-18 13:08:35,094 | INFO    | MainThread     | gitdesk | ==============================================================
+2026-10-18 13:08:35,094 | INFO    | MainThread     | gitdesk | GitDesk 启动，日志文件: D:\Git\GitDesk\GitDeskData\logs\gitdesk-2026-10-18.log
+2026-10-18 13:08:35,119 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 初始化仓库
+2026-10-18 13:08:35,156 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 创建提交
+2026-10-18 13:08:35,162 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 工作区状态读取
+2026-10-18 13:08:35,165 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 提交历史读取
+2026-10-18 13:08:35,211 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 克隆仓库
+2026-10-18 13:08:35,223 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 识别分支
+2026-10-18 13:08:35,229 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 检测未暂存更改
+2026-10-18 13:08:35,229 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 检测未跟踪文件
+2026-10-18 13:08:35,245 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 生成差异文本
+2026-10-18 13:08:35,255 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 取消暂存
+2026-10-18 13:08:35,267 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 放弃更改
+2026-10-18 13:08:35,295 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 新建并切换分支
+2026-10-18 13:08:35,310 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 切换回原分支
+2026-10-18 13:08:35,315 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 删除分支
+2026-10-18 13:08:35,374 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 推送提交到远程
+2026-10-18 13:08:35,479 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 获取远程更新并识别落后
+2026-10-18 13:08:35,511 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 拉取并快进
+2026-10-18 13:08:35,512 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 拉取后文件到位
+2026-10-18 13:08:35,547 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 空仓库状态识别
+2026-10-18 13:08:35,554 | INFO    | MainThread     | gitdesk.publish | 添加远程 origin…
+2026-10-18 13:08:35,561 | INFO    | MainThread     | gitdesk.publish | 仓库为空，自动创建 README.md…
+2026-10-18 13:08:35,564 | INFO    | MainThread     | gitdesk.publish | 暂存 1 个文件…
+2026-10-18 13:08:35,579 | INFO    | MainThread     | gitdesk.publish | 创建首个提交…
+2026-10-18 13:08:35,602 | INFO    | MainThread     | gitdesk.publish | 推送分支 main 到 origin…
+2026-10-18 13:08:35,625 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 发布时自动生成 README
+2026-10-18 13:08:35,625 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 发布时自动创建首个提交
+2026-10-18 13:08:35,625 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 发布后远程出现对应分支
+2026-10-18 13:08:35,626 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 发布后自动建立上游跟踪
+2026-10-18 13:08:35,627 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 发布后记录 origin 地址
+2026-10-18 13:08:35,628 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 重复发布不产生重复远程
+2026-10-18 13:08:35,649 | INFO    | MainThread     | gitdesk.publish | 添加远程 origin…
+2026-10-18 13:08:35,658 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 空仓库拒绝发布并给出原因
+2026-10-18 13:08:35,779 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 冲突时中止并给出提示
+2026-10-18 13:08:35,779 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 冲突时本地文件未被改动
+2026-10-18 13:08:35,779 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 非仓库目录友好报错
+2026-10-18 13:08:35,786 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 令牌密文存储
+2026-10-18 13:08:35,787 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 令牌可解密还原
+2026-10-18 13:08:35,789 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 清除账号配置
+2026-10-18 13:08:35,789 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 取消令牌可立即中止克隆
+2026-10-18 13:08:35,789 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 取消后清理未完成的目录
+2026-10-18 13:08:35,790 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 克隆进度去重上报
+2026-10-18 13:08:35,790 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 克隆传输字节被统计
+2026-10-18 13:08:35,790 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 克隆进度推进结构化详情
+2026-10-18 13:08:35,858 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 识别中文简介
+2026-10-18 13:08:35,858 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 识别英文简介
+2026-10-18 13:08:35,858 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 清理 HTML 标签
+2026-10-18 13:08:35,859 | INFO    | MainThread     | gitdesk.translate | 翻译源切换为 fake
+2026-10-18 13:08:35,861 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 英文简介被翻译
+2026-10-18 13:08:35,861 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 同一条简介只翻译一次
+2026-10-18 13:08:35,861 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 翻译结果写入缓存
+2026-10-18 13:08:35,861 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 中文简介原样返回
+2026-10-18 13:08:35,862 | INFO    | MainThread     | gitdesk.translate | 已清空翻译缓存，共 1 条
+2026-10-18 13:08:35,864 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 并发批量翻译可用
+2026-10-18 13:08:35,865 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 批量中文化统计条数
+2026-10-18 13:08:35,865 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 批量中文化结果就位
+2026-10-18 13:08:35,866 | INFO    | MainThread     | gitdesk.translate | 已清空翻译缓存，共 3 条
+2026-10-18 13:08:35,866 | DEBUG   | MainThread     | gitdesk.translate | 翻译源 fake 失败: 模拟翻译服务不可用
+2026-10-18 13:08:35,866 | DEBUG   | MainThread     | gitdesk.translate | 翻译失败，保留原文: 模拟翻译服务不可用
+2026-10-18 13:08:35,866 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 翻译不可用时回退原文
+2026-10-18 13:08:35,868 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 趋势榜解析出条目
+2026-10-18 13:08:35,868 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 趋势榜字段完整
+2026-10-18 13:08:35,868 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 趋势榜缺失字段降级
+2026-10-18 13:08:35,868 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 榜单统计中文化进度
+2026-10-18 13:08:35,868 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 头像并发加载器可用（无地址时安全跳过）
+2026-10-18 13:08:35,869 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 删除远程仓库使用 DELETE 接口
+2026-10-18 13:08:35,869 | INFO    | MainThread     | gitdesk.selftest |   [PASS] GitHub 令牌说明包含 delete_repo
+2026-10-18 13:08:35,911 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 窄窗口单列展示
+2026-10-18 13:08:35,911 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 宽窗口多列展示
+2026-10-18 13:08:35,911 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 超宽窗口列数封顶
+2026-10-18 13:08:35,911 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 异常宽度兜底为 1 列
+2026-10-18 13:08:35,911 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 识别连接被远程主机中断
+2026-10-18 13:08:35,911 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 识别本机中止连接（10053）
+2026-10-18 13:08:35,911 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 推送被拒绝不重试
+2026-10-18 13:08:35,911 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 中断给出可读提示
+2026-10-18 13:08:35,911 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 提示包含自动重试次数
+2026-10-18 13:08:35,911 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 保留原始技术细节
+2026-10-18 13:08:35,911 | WARNING | MainThread     | gitdesk.git | 自检 第 1 次尝试失败（远程主机关闭了连接），1.2 秒后重试
+2026-10-18 13:08:35,911 | WARNING | MainThread     | gitdesk.git | 自检 第 2 次尝试失败（远程主机关闭了连接），2.4 秒后重试
+2026-10-18 13:08:35,911 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 瞬时故障自动重试后成功
+2026-10-18 13:08:35,911 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 进度文本解析出阶段/对象/速度
+2026-10-18 13:08:35,911 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 无关文本不误判阶段
+2026-10-18 13:08:35,911 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 传输类型有中文名
+2026-10-18 13:08:35,911 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 详情含阶段与对象计数
+2026-10-18 13:08:35,911 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 详情含已发送字节
+2026-10-18 13:08:35,911 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 详情含耗时字段
+2026-10-18 13:08:35,916 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 结构树隐藏 .git
+2026-10-18 13:08:35,916 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 结构树目录优先
+2026-10-18 13:08:35,916 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 结构树仅显示目录
+2026-10-18 13:08:35,916 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 结构树统计目录与文件数
+2026-10-18 13:08:35,916 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 结构树跨层搜索命中嵌套文件
+2026-10-18 13:08:35,917 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 结构树无命中返回空
+2026-10-18 13:08:35,917 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 结构树大小格式化
+2026-10-18 13:08:35,923 | INFO    | MainThread     | gitdesk.selftest |   [PASS] QApplication 可创建（界面依赖就绪）
+2026-10-18 13:08:35,923 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 样式表包含瀑布流浅色背景
+2026-10-18 13:08:35,923 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 样式表包含传输面板样式
+2026-10-18 13:08:35,938 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 上传开始时出现停止按钮
+2026-10-18 13:08:35,940 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 传输详情面板可实例化并回填
+2026-10-18 13:08:35,940 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 取消令牌可置位并读取
+2026-10-18 13:08:35,941 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 已取消时不再发起新的尝试
+2026-10-18 13:08:35,941 | WARNING | MainThread     | gitdesk.git | 网络操作 第 1 次尝试失败（远程主机关闭了连接），1.2 秒后重试
+2026-10-18 13:08:35,941 | INFO    | MainThread     | gitdesk.git | 网络操作 已被用户中止，不再重试
+2026-10-18 13:08:35,941 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 重试等待期可被立刻打断
+2026-10-18 13:08:35,944 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 推送支持取消
+2026-10-18 13:08:35,947 | INFO    | MainThread     | gitdesk.publish | 添加远程 origin…
+2026-10-18 13:08:35,954 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 发布支持取消
+2026-10-18 13:08:35,982 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 概览页位于滚动容器内
+2026-10-18 13:08:35,988 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 详情展开后概览内容不被压缩
+2026-10-18 13:08:35,988 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 同步操作卡片不与仓库状态卡片重叠
+2026-10-18 13:08:35,988 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 同步操作按钮行不与说明文字重叠
+2026-10-18 13:08:35,989 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 失败时进度条切换为错误配色
+2026-10-18 13:08:35,989 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 失败后停止/关闭按钮仍可用
+2026-10-18 13:08:35,990 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 远程列表新增勾选列
+2026-10-18 13:08:35,990 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 远程列表默认全选
+2026-10-18 13:08:35,990 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 取消勾选后数量同步
+2026-10-18 13:08:35,990 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 已选数量提示可读
+2026-10-18 13:08:35,990 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 全选按钮可一键勾选全部
+2026-10-18 13:08:35,990 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 新增「推送到选中远程」按钮
+2026-10-18 13:08:35,990 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 未勾选远程时不启动推送任务
+2026-10-18 13:08:35,990 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 上游引用可解析出远程名
+2026-10-18 13:08:35,990 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 非远程上游不解析远程名
+2026-10-18 13:08:35,990 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 一致时徽标点名上游远程
+2026-10-18 13:08:35,990 | INFO    | MainThread     | gitdesk.selftest |   [PASS] 落后时徽标点名上游远程
+2026-10-18 13:08:36,045 | INFO    | MainThread     | gitdesk.selftest | GitDesk 自检报告
+时间: 2026-10-18 13:08:35
+Python: 3.13.14  冻结: True
+================================================================
+  [PASS] 初始化仓库
+  [PASS] 创建提交
+  [PASS] 工作区状态读取
+  [PASS] 提交历史读取
+  [PASS] 克隆仓库
+  [PASS] 识别分支
+  [PASS] 检测未暂存更改
+  [PASS] 检测未跟踪文件
+  [PASS] 生成差异文本
+  [PASS] 取消暂存
+  [PASS] 放弃更改
+  [PASS] 新建并切换分支
+  [PASS] 切换回原分支
+  [PASS] 删除分支
+  [PASS] 推送提交到远程
+  [PASS] 获取远程更新并识别落后
+  [PASS] 拉取并快进
+  [PASS] 拉取后文件到位
+  [PASS] 空仓库状态识别
+  [PASS] 发布时自动生成 README
+  [PASS] 发布时自动创建首个提交
+  [PASS] 发布后远程出现对应分支
+  [PASS] 发布后自动建立上游跟踪
+  [PASS] 发布后记录 origin 地址
+  [PASS] 重复发布不产生重复远程
+  [PASS] 空仓库拒绝发布并给出原因
+  [PASS] 冲突时中止并给出提示
+  [PASS] 冲突时本地文件未被改动
+  [PASS] 非仓库目录友好报错
+  [PASS] 令牌密文存储
+  [PASS] 令牌可解密还原
+  [PASS] 清除账号配置
+  [PASS] 取消令牌可立即中止克隆
+  [PASS] 取消后清理未完成的目录
+  [PASS] 克隆进度去重上报
+  [PASS] 克隆传输字节被统计
+  [PASS] 克隆进度推进结构化详情
+  [PASS] 识别中文简介
+  [PASS] 识别英文简介
+  [PASS] 清理 HTML 标签
+  [PASS] 英文简介被翻译
+  [PASS] 同一条简介只翻译一次
+  [PASS] 翻译结果写入缓存
+  [PASS] 中文简介原样返回
+  [PASS] 并发批量翻译可用
+  [PASS] 批量中文化统计条数
+  [PASS] 批量中文化结果就位
+  [PASS] 翻译不可用时回退原文
+  [PASS] 趋势榜解析出条目
+  [PASS] 趋势榜字段完整
+  [PASS] 趋势榜缺失字段降级
+  [PASS] 榜单统计中文化进度
+  [PASS] 头像并发加载器可用（无地址时安全跳过）
+  [PASS] 删除远程仓库使用 DELETE 接口
+  [PASS] GitHub 令牌说明包含 delete_repo
+  [PASS] 窄窗口单列展示
+  [PASS] 宽窗口多列展示
+  [PASS] 超宽窗口列数封顶
+  [PASS] 异常宽度兜底为 1 列
+  [PASS] 识别连接被远程主机中断
+  [PASS] 识别本机中止连接（10053）
+  [PASS] 推送被拒绝不重试
+  [PASS] 中断给出可读提示
+  [PASS] 提示包含自动重试次数
+  [PASS] 保留原始技术细节
+  [PASS] 瞬时故障自动重试后成功
+  [PASS] 进度文本解析出阶段/对象/速度
+  [PASS] 无关文本不误判阶段
+  [PASS] 传输类型有中文名
+  [PASS] 详情含阶段与对象计数
+  [PASS] 详情含已发送字节
+  [PASS] 详情含耗时字段
+  [PASS] 结构树隐藏 .git
+  [PASS] 结构树目录优先
+  [PASS] 结构树仅显示目录
+  [PASS] 结构树统计目录与文件数
+  [PASS] 结构树跨层搜索命中嵌套文件
+  [PASS] 结构树无命中返回空
+  [PASS] 结构树大小格式化
+  [PASS] QApplication 可创建（界面依赖就绪）
+  [PASS] 样式表包含瀑布流浅色背景
+  [PASS] 样式表包含传输面板样式
+  [PASS] 上传开始时出现停止按钮
+  [PASS] 传输详情面板可实例化并回填
+  [PASS] 取消令牌可置位并读取
+  [PASS] 已取消时不再发起新的尝试
+  [PASS] 重试等待期可被立刻打断
+  [PASS] 推送支持取消
+  [PASS] 发布支持取消
+  [PASS] 概览页位于滚动容器内
+  [PASS] 详情展开后概览内容不被压缩
+  [PASS] 同步操作卡片不与仓库状态卡片重叠
+  [PASS] 同步操作按钮行不与说明文字重叠
+  [PASS] 失败时进度条切换为错误配色
+  [PASS] 失败后停止/关闭按钮仍可用
+  [PASS] 远程列表新增勾选列
+  [PASS] 远程列表默认全选
+  [PASS] 取消勾选后数量同步
+  [PASS] 已选数量提示可读
+  [PASS] 全选按钮可一键勾选全部
+  [PASS] 新增「推送到选中远程」按钮
+  [PASS] 未勾选远程时不启动推送任务
+  [PASS] 上游引用可解析出远程名
+  [PASS] 非远程上游不解析远程名
+  [PASS] 一致时徽标点名上游远程
+  [PASS] 落后时徽标点名上游远程
+================================================================
+通过 106 项，失败 0 项，用时 0.95 秒
+2026-10-18 13:08:36,046 | INFO    | MainThread     | gitdesk.selftest | 报告已写入: C:/Users/32721/AppData/Local/Temp/st-a019aa.txt

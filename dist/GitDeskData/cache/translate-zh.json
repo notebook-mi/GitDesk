@@ -28,5 +28,15 @@
 "78dea20c4d7eaae5e1ff6584d79be21ccc979a3d": "VoiceStudio 是 ElevenLabs 的开源、完全本地化替代方案 — 提供 646 种语言的语音克隆、语音设计、视频配音、听写、转录和有声读物创建。",
 "0cb7dedab8150f43d2f298d2dee63cee504b52ad": "开源LLM知识平台：将原始文档变成可查询的RAG、自主推理代理和自我维护的Wiki。",
 "428732ee42ff78a3724f49f878664f817ce2e010": "更智能、自托管的人工智能助手——多用户、多代理。",
-"9ca67cf52b528e7cb18a9d81132d08796fc49778": "事后诸葛亮：智能体的学习记忆"
+"9ca67cf52b528e7cb18a9d81132d08796fc49778": "事后诸葛亮：智能体的学习记忆",
+"de16d13e0c6015e365f4671e5ff317ebfb583e0e": "用户友好的AI界面（支持Ollama、OpenAI API等）",
+"d07306fe741ff16514cfee4da0c31b6f3e2b4ad1": "ArtCraft是艺术家、设计师和电影制作人的特意制作引擎",
+"0985f12392e1bd4edb2e744a736f28b1e6900305": "浏览器中的间谍卫星模拟器，但数据是真实的。在逼真的3D地球仪上实时开源空间智能。",
+"df9a6af97c269de4106ee979d265bee7774794b2": "Claude Code、Codex、GitHub Copilot、Cursor、Factory Droid和Pi的编辑图设计。44种图类型。独立的HTML + SVG。没有阴影，没有美人鱼粪便。",
+"ab292695cbcbd74c4b825fa07f22b616a69ad6c0": "人工智能编码代理的上下文窗口优化。沙盒工具输出（减少98 ％ ） ，保持会话内存，并通过MCP +钩子在17个平台上强制路由。",
+"d0d80379dd24d8c1bea3a3d8a44933e69fc4d742": "使用单个4GB GPU的AirLLM 70B推理",
+"862c8ad31678ce77b90c4478c422f910ba16fc5a": "1位LLM的官方推理框架",
+"46131b106445a3da3166475af5d34c2f62e12bd9": "从您的终端、应用程序、IDE或手机免费使用Claude Code、Codex、VSCode、Pi和OpenCode （以及其他6种线束） （ 13亿+免费令牌） ，现在从浏览器使用本机浏览器会话（多哈尼斯+多模型） ，如OpenClaw （支持语音+ ToS友好）",
+"094c343a3235eafbb617c28321eb082a9cd25cb6": "由 Anthropic 管理的官方高品质 Claude 代码插件目录。",
+"cbd815d5e5b386816483bd1ec53ff794874d0d5e": "Ghidra 是一个软件逆向工程 (SRE) 框架"
 }
