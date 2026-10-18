@@ -2004,6 +2004,29 @@ def test_merge_branch(app: QApplication) -> None:
           detail.btn_branch_merge.text() == "合并到当前分支",
           detail.btn_branch_merge.text())
 
+    # 只断言文字不够：按钮必须真的挂在分支页签的工具栏布局里、且对用户可见，
+    # 否则会出现「代码里有、界面上没有」的假象。
+    branch_page = detail.tabs.widget(3)
+    branch_bar = branch_page.layout().itemAt(0).layout()
+    check("合并按钮挂在分支页签工具栏布局中",
+          branch_bar is not None and branch_bar.indexOf(detail.btn_branch_merge) >= 0,
+          f"index={branch_bar.indexOf(detail.btn_branch_merge) if branch_bar else 'no-layout'}")
+    check("合并按钮紧随「切换到选中分支」",
+          branch_bar.indexOf(detail.btn_branch_merge)
+          == branch_bar.indexOf(detail.btn_branch_switch) + 1,
+          f"switch={branch_bar.indexOf(detail.btn_branch_switch)} "
+          f"merge={branch_bar.indexOf(detail.btn_branch_merge)}")
+    check("合并按钮对用户可见（未被隐藏/挤压）",
+          detail.btn_branch_merge.isVisibleTo(branch_page)
+          and detail.btn_branch_merge.width() > 0,
+          f"visibleTo={detail.btn_branch_merge.isVisibleTo(branch_page)} "
+          f"w={detail.btn_branch_merge.width()}")
+    check("分支工具栏共 5 个按钮",
+          sum(1 for i in range(branch_bar.count())
+              if branch_bar.itemAt(i).widget() is not None) == 5,
+          str(sum(1 for i in range(branch_bar.count())
+                  if branch_bar.itemAt(i).widget() is not None)))
+
     notices: list[tuple] = []
     detail.notify.connect(lambda message, level="info": notices.append((message, level)))
 

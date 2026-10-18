@@ -122,3 +122,15 @@ Windows 桌面端 GitHub/Gitee 仓库管理器，交付单文件绿色 exe，内
 ## 环境
 - 隔离 venv：`C:\Users\32721\.workbuddy\binaries\python\envs\gitdesk`
 - PySide6 需从官方 PyPI 安装（清华镜像不收录 PySide6）
+
+## 陷阱：磁盘上有多个 GitDesk.exe，用户会误开旧包
+- **唯一有效交付路径：`D:\Git\GitDesk\dist\GitDesk.exe`**
+- 历史遗留旧副本（10-12 的 v1.1.3，自检 106 项，无提交演化图 / 无分支合并）：
+  `D:\Git\GitDesk\GitDesk.exe`、`D:\project\GitDesk\dist\GitDesk.exe`、`D:\Git\photoWeb\dist\GitDesk.exe`
+- 用户报「某功能不见了」时，**先验证跑的是哪个包**，别急着改代码：
+  1. 窗口标题/侧边栏看「版本 x.y.z」
+  2. `GitDesk.exe --self-test <文件>` 数通过项（106=v1.1.3，114=v1.2.1，118=v1.2.2）
+  3. 离屏探针渲染目标页签，打印每个按钮的 text/visible/geometry
+- `dist/GitDesk.exe` 是**被 git 跟踪的**：`git checkout/restore` 会把 exe 还原成提交时的旧版本，
+  打包后务必核对 SHA256 与 `--self-test` 项数。
+
