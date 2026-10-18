@@ -1999,3 +1999,206 @@
 2026-10-18 13:16:58,688 | DEBUG   | Dummy-72       | gitdesk.task | 任务开始: 变更检测
 2026-10-18 13:16:58,700 | DEBUG   | Dummy-73       | gitdesk.task | 任务开始: 创建提交
 2026-10-18 13:16:58,751 | DEBUG   | Dummy-72       | gitdesk.task | 任务完成: 变更检测
+2026-10-18 13:16:58,788 | DEBUG   | Dummy-73       | gitdesk.task | 任务完成: 创建提交
+2026-10-18 13:16:58,790 | INFO    | MainThread     | gitdesk.ui.repos | 提交成功 aa3c0d76eada5b6a59e73aa512ee1033ffc2d4da
+2026-10-18 13:16:58,791 | DEBUG   | Dummy-74       | gitdesk.task | 任务开始: 刷新仓库状态
+2026-10-18 13:16:58,791 | DEBUG   | Dummy-75       | gitdesk.task | 任务开始: 读取提交图
+2026-10-18 13:16:58,792 | DEBUG   | Dummy-76       | gitdesk.task | 任务开始: 读取提交历史
+2026-10-18 13:16:58,792 | DEBUG   | Dummy-77       | gitdesk.task | 任务开始: 读取远程列表
+2026-10-18 13:16:58,792 | DEBUG   | Dummy-78       | gitdesk.task | 任务开始: 读取暂存列表
+2026-10-18 13:16:58,792 | DEBUG   | Dummy-79       | gitdesk.task | 任务开始: 读取分支列表
+2026-10-18 13:16:58,794 | DEBUG   | Dummy-78       | gitdesk.task | 任务完成: 读取暂存列表
+2026-10-18 13:16:58,794 | DEBUG   | Dummy-77       | gitdesk.task | 任务完成: 读取远程列表
+2026-10-18 13:16:58,815 | DEBUG   | Dummy-79       | gitdesk.task | 任务完成: 读取分支列表
+2026-10-18 13:16:58,816 | DEBUG   | Dummy-75       | gitdesk.task | 任务完成: 读取提交图
+2026-10-18 13:16:58,823 | DEBUG   | Dummy-76       | gitdesk.task | 任务完成: 读取提交历史
+2026-10-18 13:16:58,858 | DEBUG   | Dummy-74       | gitdesk.task | 任务完成: 刷新仓库状态
+2026-10-18 13:17:03,689 | DEBUG   | Dummy-80       | gitdesk.task | 任务开始: 变更检测
+2026-10-18 13:17:03,724 | DEBUG   | Dummy-80       | gitdesk.task | 任务完成: 变更检测
+2026-10-18 13:17:06,760 | DEBUG   | Dummy-81       | gitdesk.task | 任务开始: 恢复暂存
+2026-10-18 13:17:06,762 | ERROR   | Dummy-81       | gitdesk.task | 任务失败[恢复暂存]: 恢复暂存失败：操作失败：list index out of range
+2026-10-18 13:17:06,762 | DEBUG   | Dummy-81       | gitdesk.task | 任务失败详情[恢复暂存]: IndexError: list index out of range
+2026-10-18 13:17:08,690 | DEBUG   | Dummy-82       | gitdesk.task | 任务开始: 变更检测
+2026-10-18 13:17:08,730 | DEBUG   | Dummy-82       | gitdesk.task | 任务完成: 变更检测
+2026-10-18 13:17:09,102 | DEBUG   | Dummy-83       | gitdesk.task | 任务开始: 读取暂存列表
+2026-10-18 13:17:09,104 | DEBUG   | Dummy-83       | gitdesk.task | 任务完成: 读取暂存列表
+2026-10-18 13:17:11,882 | DEBUG   | Dummy-84       | gitdesk.task | 任务开始: 生成差异 dist/GitDeskData/logs/gitdesk-2026-10-18.log
+2026-10-18 13:17:11,888 | DEBUG   | Dummy-84       | gitdesk.task | 任务完成: 生成差异 dist/GitDeskData/logs/gitdesk-2026-10-18.log
+2026-10-18 13:17:12,841 | DEBUG   | Dummy-85       | gitdesk.task | 任务开始: 生成差异 dist/GitDeskData/logs/gitdesk-2026-10-18.log
+2026-10-18 13:17:12,847 | DEBUG   | Dummy-85       | gitdesk.task | 任务完成: 生成差异 dist/GitDeskData/logs/gitdesk-2026-10-18.log
+2026-10-18 13:17:13,154 | DEBUG   | Dummy-86       | gitdesk.task | 任务开始: 生成差异 dist/GitDeskData/logs/gitdesk-2026-10-18.log
+2026-10-18 13:17:13,163 | DEBUG   | Dummy-86       | gitdesk.task | 任务完成: 生成差异 dist/GitDeskData/logs/gitdesk-2026-10-18.log
+2026-10-18 13:17:13,606 | DEBUG   | Dummy-87       | gitdesk.task | 任务开始: 生成差异 dist/GitDeskData/repos.json
+2026-10-18 13:17:13,611 | DEBUG   | Dummy-87       | gitdesk.task | 任务完成: 生成差异 dist/GitDeskData/repos.json
+2026-10-18 13:17:13,690 | DEBUG   | Dummy-88       | gitdesk.task | 任务开始: 变更检测
+2026-10-18 13:17:13,728 | DEBUG   | Dummy-88       | gitdesk.task | 任务完成: 变更检测
+2026-10-18 13:17:14,712 | DEBUG   | Dummy-89       | gitdesk.task | 任务开始: 生成差异 dist/GitDeskData/logs/gitdesk-2026-10-18.log
+2026-10-18 13:17:14,719 | DEBUG   | Dummy-89       | gitdesk.task | 任务完成: 生成差异 dist/GitDeskData/logs/gitdesk-2026-10-18.log
+2026-10-18 13:17:15,161 | DEBUG   | Dummy-90       | gitdesk.task | 任务开始: 生成差异 dist/GitDeskData/repos.json
+2026-10-18 13:17:15,165 | DEBUG   | Dummy-90       | gitdesk.task | 任务完成: 生成差异 dist/GitDeskData/repos.json
+2026-10-18 13:17:15,814 | DEBUG   | Dummy-91       | gitdesk.task | 任务开始: 生成差异 dist/GitDeskData/logs/gitdesk-2026-10-18.log
+2026-10-18 13:17:15,821 | DEBUG   | Dummy-91       | gitdesk.task | 任务完成: 生成差异 dist/GitDeskData/logs/gitdesk-2026-10-18.log
+2026-10-18 13:17:18,688 | DEBUG   | Dummy-92       | gitdesk.task | 任务开始: 变更检测
+2026-10-18 13:17:18,722 | DEBUG   | Dummy-92       | gitdesk.task | 任务完成: 变更检测
+2026-10-18 13:17:19,188 | DEBUG   | Dummy-93       | gitdesk.task | 任务开始: 生成差异 dist/GitDeskData/repos.json
+2026-10-18 13:17:19,191 | DEBUG   | Dummy-93       | gitdesk.task | 任务完成: 生成差异 dist/GitDeskData/repos.json
+2026-10-18 13:17:23,687 | DEBUG   | Dummy-94       | gitdesk.task | 任务开始: 变更检测
+2026-10-18 13:17:23,731 | DEBUG   | Dummy-94       | gitdesk.task | 任务完成: 变更检测
+2026-10-18 13:17:23,937 | DEBUG   | Dummy-95       | gitdesk.task | 任务开始: 暂存更改
+2026-10-18 13:17:23,961 | DEBUG   | Dummy-95       | gitdesk.task | 任务完成: 暂存更改
+2026-10-18 13:17:23,964 | INFO    | MainThread     | gitdesk.ui.repos | 已暂存 2 个文件
+2026-10-18 13:17:23,965 | DEBUG   | Dummy-96       | gitdesk.task | 任务开始: 刷新仓库状态
+2026-10-18 13:17:23,965 | DEBUG   | Dummy-97       | gitdesk.task | 任务开始: 读取提交历史
+2026-10-18 13:17:23,966 | DEBUG   | Dummy-98       | gitdesk.task | 任务开始: 读取分支列表
+2026-10-18 13:17:23,966 | DEBUG   | Dummy-99       | gitdesk.task | 任务开始: 读取暂存列表
+2026-10-18 13:17:23,966 | DEBUG   | Dummy-100      | gitdesk.task | 任务开始: 读取远程列表
+2026-10-18 13:17:23,966 | DEBUG   | Dummy-101      | gitdesk.task | 任务开始: 读取提交图
+2026-10-18 13:17:23,969 | DEBUG   | Dummy-99       | gitdesk.task | 任务完成: 读取暂存列表
+2026-10-18 13:17:23,969 | DEBUG   | Dummy-100      | gitdesk.task | 任务完成: 读取远程列表
+2026-10-18 13:17:23,989 | DEBUG   | Dummy-98       | gitdesk.task | 任务完成: 读取分支列表
+2026-10-18 13:17:23,990 | DEBUG   | Dummy-101      | gitdesk.task | 任务完成: 读取提交图
+2026-10-18 13:17:23,997 | DEBUG   | Dummy-97       | gitdesk.task | 任务完成: 读取提交历史
+2026-10-18 13:17:24,034 | DEBUG   | Dummy-96       | gitdesk.task | 任务完成: 刷新仓库状态
+2026-10-18 13:17:24,041 | DEBUG   | Dummy-102      | gitdesk.task | 任务开始: 生成差异 dist/GitDeskData/repos.json
+2026-10-18 13:17:24,044 | DEBUG   | Dummy-102      | gitdesk.task | 任务完成: 生成差异 dist/GitDeskData/repos.json
+2026-10-18 13:17:28,687 | DEBUG   | Dummy-103      | gitdesk.task | 任务开始: 变更检测
+2026-10-18 13:17:28,723 | DEBUG   | Dummy-103      | gitdesk.task | 任务完成: 变更检测
+2026-10-18 13:17:33,689 | DEBUG   | Dummy-104      | gitdesk.task | 任务开始: 变更检测
+2026-10-18 13:17:33,721 | DEBUG   | Dummy-104      | gitdesk.task | 任务完成: 变更检测
+2026-10-18 13:17:38,687 | DEBUG   | Dummy-105      | gitdesk.task | 任务开始: 变更检测
+2026-10-18 13:17:38,729 | DEBUG   | Dummy-105      | gitdesk.task | 任务完成: 变更检测
+2026-10-18 13:17:43,694 | DEBUG   | Dummy-106      | gitdesk.task | 任务开始: 变更检测
+2026-10-18 13:17:43,734 | DEBUG   | Dummy-106      | gitdesk.task | 任务完成: 变更检测
+2026-10-18 13:17:45,558 | DEBUG   | Dummy-107      | gitdesk.task | 任务开始: 生成差异 dist/GitDeskData/logs/gitdesk-2026-10-18.log
+2026-10-18 13:17:45,566 | DEBUG   | Dummy-107      | gitdesk.task | 任务完成: 生成差异 dist/GitDeskData/logs/gitdesk-2026-10-18.log
+2026-10-18 13:17:46,876 | DEBUG   | Dummy-108      | gitdesk.task | 任务开始: 生成差异 dist/GitDeskData/logs/gitdesk-2026-10-18.log
+2026-10-18 13:17:46,886 | DEBUG   | Dummy-108      | gitdesk.task | 任务完成: 生成差异 dist/GitDeskData/logs/gitdesk-2026-10-18.log
+2026-10-18 13:17:47,961 | DEBUG   | Dummy-109      | gitdesk.task | 任务开始: 生成差异 dist/GitDeskData/repos.json
+2026-10-18 13:17:47,967 | DEBUG   | Dummy-109      | gitdesk.task | 任务完成: 生成差异 dist/GitDeskData/repos.json
+2026-10-18 13:17:48,689 | DEBUG   | Dummy-110      | gitdesk.task | 任务开始: 变更检测
+2026-10-18 13:17:48,724 | DEBUG   | Dummy-110      | gitdesk.task | 任务完成: 变更检测
+2026-10-18 13:17:49,096 | DEBUG   | Dummy-111      | gitdesk.task | 任务开始: 生成差异 dist/GitDeskData/logs/gitdesk-2026-10-18.log
+2026-10-18 13:17:49,107 | DEBUG   | Dummy-111      | gitdesk.task | 任务完成: 生成差异 dist/GitDeskData/logs/gitdesk-2026-10-18.log
+2026-10-18 13:17:49,917 | DEBUG   | Dummy-112      | gitdesk.task | 任务开始: 生成差异 dist/GitDeskData/logs/gitdesk-2026-10-18.log
+2026-10-18 13:17:49,923 | DEBUG   | Dummy-112      | gitdesk.task | 任务完成: 生成差异 dist/GitDeskData/logs/gitdesk-2026-10-18.log
+2026-10-18 13:17:50,540 | DEBUG   | Dummy-113      | gitdesk.task | 任务开始: 生成差异 dist/GitDeskData/logs/gitdesk-2026-10-18.log
+2026-10-18 13:17:50,550 | DEBUG   | Dummy-113      | gitdesk.task | 任务完成: 生成差异 dist/GitDeskData/logs/gitdesk-2026-10-18.log
+2026-10-18 13:17:51,601 | DEBUG   | Dummy-114      | gitdesk.task | 任务开始: 生成差异 dist/GitDeskData/logs/gitdesk-2026-10-18.log
+2026-10-18 13:17:51,607 | DEBUG   | Dummy-114      | gitdesk.task | 任务完成: 生成差异 dist/GitDeskData/logs/gitdesk-2026-10-18.log
+2026-10-18 13:17:52,428 | DEBUG   | Dummy-115      | gitdesk.task | 任务开始: 生成差异 dist/GitDeskData/logs/gitdesk-2026-10-18.log
+2026-10-18 13:17:52,438 | DEBUG   | Dummy-115      | gitdesk.task | 任务完成: 生成差异 dist/GitDeskData/logs/gitdesk-2026-10-18.log
+2026-10-18 13:17:53,239 | DEBUG   | Dummy-116      | gitdesk.task | 任务开始: 生成差异 dist/GitDeskData/repos.json
+2026-10-18 13:17:53,246 | DEBUG   | Dummy-116      | gitdesk.task | 任务完成: 生成差异 dist/GitDeskData/repos.json
+2026-10-18 13:17:53,713 | DEBUG   | Dummy-117      | gitdesk.task | 任务开始: 变更检测
+2026-10-18 13:17:53,748 | DEBUG   | Dummy-117      | gitdesk.task | 任务完成: 变更检测
+2026-10-18 13:17:54,811 | DEBUG   | Dummy-118      | gitdesk.task | 任务开始: 生成差异 dist/GitDeskData/logs/gitdesk-2026-10-18.log
+2026-10-18 13:17:54,817 | DEBUG   | Dummy-118      | gitdesk.task | 任务完成: 生成差异 dist/GitDeskData/logs/gitdesk-2026-10-18.log
+2026-10-18 13:17:55,978 | DEBUG   | Dummy-119      | gitdesk.task | 任务开始: 生成差异 dist/GitDeskData/logs/gitdesk-2026-10-18.log
+2026-10-18 13:17:55,986 | DEBUG   | Dummy-119      | gitdesk.task | 任务完成: 生成差异 dist/GitDeskData/logs/gitdesk-2026-10-18.log
+2026-10-18 13:17:56,422 | DEBUG   | Dummy-120      | gitdesk.task | 任务开始: 生成差异 dist/GitDeskData/repos.json
+2026-10-18 13:17:56,430 | DEBUG   | Dummy-120      | gitdesk.task | 任务完成: 生成差异 dist/GitDeskData/repos.json
+2026-10-18 13:17:57,045 | DEBUG   | Dummy-121      | gitdesk.task | 任务开始: 生成差异 dist/GitDeskData/logs/gitdesk-2026-10-18.log
+2026-10-18 13:17:57,055 | DEBUG   | Dummy-121      | gitdesk.task | 任务完成: 生成差异 dist/GitDeskData/logs/gitdesk-2026-10-18.log
+2026-10-18 13:17:57,430 | DEBUG   | Dummy-122      | gitdesk.task | 任务开始: 生成差异 dist/GitDeskData/repos.json
+2026-10-18 13:17:57,438 | DEBUG   | Dummy-122      | gitdesk.task | 任务完成: 生成差异 dist/GitDeskData/repos.json
+2026-10-18 13:17:58,442 | DEBUG   | Dummy-123      | gitdesk.task | 任务开始: 生成差异 dist/GitDeskData/logs/gitdesk-2026-10-18.log
+2026-10-18 13:17:58,449 | DEBUG   | Dummy-123      | gitdesk.task | 任务完成: 生成差异 dist/GitDeskData/logs/gitdesk-2026-10-18.log
+2026-10-18 13:17:58,705 | DEBUG   | Dummy-124      | gitdesk.task | 任务开始: 变更检测
+2026-10-18 13:17:58,741 | DEBUG   | Dummy-124      | gitdesk.task | 任务完成: 变更检测
+2026-10-18 13:17:58,789 | DEBUG   | Dummy-125      | gitdesk.task | 任务开始: 生成差异 dist/GitDeskData/repos.json
+2026-10-18 13:17:58,794 | DEBUG   | Dummy-125      | gitdesk.task | 任务完成: 生成差异 dist/GitDeskData/repos.json
+2026-10-18 13:17:59,390 | DEBUG   | Dummy-126      | gitdesk.task | 任务开始: 生成差异 dist/GitDeskData/logs/gitdesk-2026-10-18.log
+2026-10-18 13:17:59,396 | DEBUG   | Dummy-126      | gitdesk.task | 任务完成: 生成差异 dist/GitDeskData/logs/gitdesk-2026-10-18.log
+2026-10-18 13:17:59,870 | DEBUG   | Dummy-127      | gitdesk.task | 任务开始: 生成差异 dist/GitDeskData/repos.json
+2026-10-18 13:17:59,875 | DEBUG   | Dummy-127      | gitdesk.task | 任务完成: 生成差异 dist/GitDeskData/repos.json
+2026-10-18 13:18:01,350 | DEBUG   | Dummy-128      | gitdesk.task | 任务开始: 生成差异 dist/GitDeskData/repos.json
+2026-10-18 13:18:01,358 | DEBUG   | Dummy-128      | gitdesk.task | 任务完成: 生成差异 dist/GitDeskData/repos.json
+2026-10-18 13:18:02,206 | DEBUG   | Dummy-129      | gitdesk.task | 任务开始: 生成差异 dist/GitDeskData/repos.json
+2026-10-18 13:18:02,210 | DEBUG   | Dummy-129      | gitdesk.task | 任务完成: 生成差异 dist/GitDeskData/repos.json
+2026-10-18 13:18:02,802 | DEBUG   | Dummy-130      | gitdesk.task | 任务开始: 生成差异 dist/GitDeskData/logs/gitdesk-2026-10-18.log
+2026-10-18 13:18:02,811 | DEBUG   | Dummy-130      | gitdesk.task | 任务完成: 生成差异 dist/GitDeskData/logs/gitdesk-2026-10-18.log
+2026-10-18 13:18:03,622 | DEBUG   | Dummy-131      | gitdesk.task | 任务开始: 生成差异 dist/GitDeskData/repos.json
+2026-10-18 13:18:03,629 | DEBUG   | Dummy-131      | gitdesk.task | 任务完成: 生成差异 dist/GitDeskData/repos.json
+2026-10-18 13:18:03,722 | DEBUG   | Dummy-132      | gitdesk.task | 任务开始: 变更检测
+2026-10-18 13:18:03,764 | DEBUG   | Dummy-132      | gitdesk.task | 任务完成: 变更检测
+2026-10-18 13:18:08,721 | DEBUG   | Dummy-133      | gitdesk.task | 任务开始: 变更检测
+2026-10-18 13:18:08,759 | DEBUG   | Dummy-133      | gitdesk.task | 任务完成: 变更检测
+2026-10-18 13:18:13,733 | DEBUG   | Dummy-134      | gitdesk.task | 任务开始: 变更检测
+2026-10-18 13:18:13,769 | DEBUG   | Dummy-134      | gitdesk.task | 任务完成: 变更检测
+2026-10-18 13:18:18,722 | DEBUG   | Dummy-135      | gitdesk.task | 任务开始: 变更检测
+2026-10-18 13:18:18,758 | DEBUG   | Dummy-135      | gitdesk.task | 任务完成: 变更检测
+2026-10-18 13:18:23,652 | DEBUG   | Dummy-136      | gitdesk.task | 任务开始: 远程更新探测
+2026-10-18 13:18:23,731 | DEBUG   | Dummy-137      | gitdesk.task | 任务开始: 变更检测
+2026-10-18 13:18:23,768 | DEBUG   | Dummy-137      | gitdesk.task | 任务完成: 变更检测
+2026-10-18 13:18:24,553 | DEBUG   | Dummy-136      | gitdesk.task | 任务完成: 远程更新探测
+2026-10-18 13:18:28,736 | DEBUG   | Dummy-138      | gitdesk.task | 任务开始: 变更检测
+2026-10-18 13:18:28,772 | DEBUG   | Dummy-138      | gitdesk.task | 任务完成: 变更检测
+2026-10-18 13:18:33,744 | DEBUG   | Dummy-139      | gitdesk.task | 任务开始: 变更检测
+2026-10-18 13:18:33,780 | DEBUG   | Dummy-139      | gitdesk.task | 任务完成: 变更检测
+2026-10-18 13:18:33,786 | INFO    | MainThread     | gitdesk.ui.repos | 工作区发生变化，当前共 8 个变更文件
+2026-10-18 13:18:38,736 | DEBUG   | Dummy-140      | gitdesk.task | 任务开始: 变更检测
+2026-10-18 13:18:38,774 | DEBUG   | Dummy-140      | gitdesk.task | 任务完成: 变更检测
+2026-10-18 13:18:38,820 | DEBUG   | Dummy-141      | gitdesk.task | 任务开始: 暂存更改
+2026-10-18 13:18:38,842 | DEBUG   | Dummy-141      | gitdesk.task | 任务完成: 暂存更改
+2026-10-18 13:18:38,844 | INFO    | MainThread     | gitdesk.ui.repos | 已暂存 6 个文件
+2026-10-18 13:18:38,847 | DEBUG   | Dummy-142      | gitdesk.task | 任务开始: 刷新仓库状态
+2026-10-18 13:18:38,847 | DEBUG   | Dummy-143      | gitdesk.task | 任务开始: 读取分支列表
+2026-10-18 13:18:38,847 | DEBUG   | Dummy-144      | gitdesk.task | 任务开始: 读取提交图
+2026-10-18 13:18:38,848 | DEBUG   | Dummy-145      | gitdesk.task | 任务开始: 读取提交历史
+2026-10-18 13:18:38,848 | DEBUG   | Dummy-146      | gitdesk.task | 任务开始: 读取暂存列表
+2026-10-18 13:18:38,848 | DEBUG   | Dummy-147      | gitdesk.task | 任务开始: 读取远程列表
+2026-10-18 13:18:38,852 | DEBUG   | Dummy-146      | gitdesk.task | 任务完成: 读取暂存列表
+2026-10-18 13:18:38,853 | DEBUG   | Dummy-147      | gitdesk.task | 任务完成: 读取远程列表
+2026-10-18 13:18:38,873 | DEBUG   | Dummy-143      | gitdesk.task | 任务完成: 读取分支列表
+2026-10-18 13:18:38,873 | DEBUG   | Dummy-144      | gitdesk.task | 任务完成: 读取提交图
+2026-10-18 13:18:38,881 | DEBUG   | Dummy-145      | gitdesk.task | 任务完成: 读取提交历史
+2026-10-18 13:18:38,919 | DEBUG   | Dummy-142      | gitdesk.task | 任务完成: 刷新仓库状态
+2026-10-18 13:18:43,746 | DEBUG   | Dummy-148      | gitdesk.task | 任务开始: 变更检测
+2026-10-18 13:18:43,786 | DEBUG   | Dummy-148      | gitdesk.task | 任务完成: 变更检测
+2026-10-18 13:18:48,538 | DEBUG   | Dummy-149      | gitdesk.task | 任务开始: 生成差异 dist/GitDeskData/logs/gitdesk-2026-10-18.log
+2026-10-18 13:18:48,545 | DEBUG   | Dummy-149      | gitdesk.task | 任务完成: 生成差异 dist/GitDeskData/logs/gitdesk-2026-10-18.log
+2026-10-18 13:18:48,737 | DEBUG   | Dummy-150      | gitdesk.task | 任务开始: 变更检测
+2026-10-18 13:18:48,773 | DEBUG   | Dummy-150      | gitdesk.task | 任务完成: 变更检测
+2026-10-18 13:18:50,597 | DEBUG   | Dummy-151      | gitdesk.task | 任务开始: 暂存更改
+2026-10-18 13:18:50,620 | DEBUG   | Dummy-151      | gitdesk.task | 任务完成: 暂存更改
+2026-10-18 13:18:50,622 | INFO    | MainThread     | gitdesk.ui.repos | 已暂存 1 个文件
+2026-10-18 13:18:50,623 | DEBUG   | Dummy-152      | gitdesk.task | 任务开始: 刷新仓库状态
+2026-10-18 13:18:50,624 | DEBUG   | Dummy-153      | gitdesk.task | 任务开始: 读取远程列表
+2026-10-18 13:18:50,624 | DEBUG   | Dummy-154      | gitdesk.task | 任务开始: 读取暂存列表
+2026-10-18 13:18:50,624 | DEBUG   | Dummy-155      | gitdesk.task | 任务开始: 读取分支列表
+2026-10-18 13:18:50,624 | DEBUG   | Dummy-156      | gitdesk.task | 任务开始: 读取提交历史
+2026-10-18 13:18:50,624 | DEBUG   | Dummy-157      | gitdesk.task | 任务开始: 读取提交图
+2026-10-18 13:18:50,627 | DEBUG   | Dummy-154      | gitdesk.task | 任务完成: 读取暂存列表
+2026-10-18 13:18:50,628 | DEBUG   | Dummy-153      | gitdesk.task | 任务完成: 读取远程列表
+2026-10-18 13:18:50,648 | DEBUG   | Dummy-155      | gitdesk.task | 任务完成: 读取分支列表
+2026-10-18 13:18:50,651 | DEBUG   | Dummy-157      | gitdesk.task | 任务完成: 读取提交图
+2026-10-18 13:18:50,657 | DEBUG   | Dummy-156      | gitdesk.task | 任务完成: 读取提交历史
+2026-10-18 13:18:50,691 | DEBUG   | Dummy-152      | gitdesk.task | 任务完成: 刷新仓库状态
+2026-10-18 13:18:50,698 | DEBUG   | Dummy-158      | gitdesk.task | 任务开始: 生成差异 dist/GitDeskData/logs/gitdesk-2026-10-18.log
+2026-10-18 13:18:50,704 | DEBUG   | Dummy-158      | gitdesk.task | 任务完成: 生成差异 dist/GitDeskData/logs/gitdesk-2026-10-18.log
+2026-10-18 13:18:53,753 | DEBUG   | Dummy-159      | gitdesk.task | 任务开始: 变更检测
+2026-10-18 13:18:53,788 | DEBUG   | Dummy-159      | gitdesk.task | 任务完成: 变更检测
+2026-10-18 13:18:53,828 | DEBUG   | Dummy-160      | gitdesk.task | 任务开始: 暂存更改
+2026-10-18 13:18:53,850 | DEBUG   | Dummy-160      | gitdesk.task | 任务完成: 暂存更改
+2026-10-18 13:18:53,852 | INFO    | MainThread     | gitdesk.ui.repos | 已暂存 2 个文件
+2026-10-18 13:18:53,854 | DEBUG   | Dummy-161      | gitdesk.task | 任务开始: 刷新仓库状态
+2026-10-18 13:18:53,855 | DEBUG   | Dummy-162      | gitdesk.task | 任务开始: 读取提交历史
+2026-10-18 13:18:53,855 | DEBUG   | Dummy-163      | gitdesk.task | 任务开始: 读取分支列表
+2026-10-18 13:18:53,855 | DEBUG   | Dummy-164      | gitdesk.task | 任务开始: 读取提交图
+2026-10-18 13:18:53,855 | DEBUG   | Dummy-165      | gitdesk.task | 任务开始: 读取远程列表
+2026-10-18 13:18:53,855 | DEBUG   | Dummy-166      | gitdesk.task | 任务开始: 读取暂存列表
+2026-10-18 13:18:53,858 | DEBUG   | Dummy-166      | gitdesk.task | 任务完成: 读取暂存列表
+2026-10-18 13:18:53,858 | DEBUG   | Dummy-165      | gitdesk.task | 任务完成: 读取远程列表
+2026-10-18 13:18:53,878 | DEBUG   | Dummy-163      | gitdesk.task | 任务完成: 读取分支列表
+2026-10-18 13:18:53,880 | DEBUG   | Dummy-164      | gitdesk.task | 任务完成: 读取提交图
+2026-10-18 13:18:53,886 | DEBUG   | Dummy-162      | gitdesk.task | 任务完成: 读取提交历史
+2026-10-18 13:18:53,921 | DEBUG   | Dummy-161      | gitdesk.task | 任务完成: 刷新仓库状态
+2026-10-18 13:18:56,548 | DEBUG   | Dummy-167      | gitdesk.task | 任务开始: 生成差异 dist/GitDeskData/logs/gitdesk-2026-10-18.log
+2026-10-18 13:18:56,554 | DEBUG   | Dummy-167      | gitdesk.task | 任务完成: 生成差异 dist/GitDeskData/logs/gitdesk-2026-10-18.log
+2026-10-18 13:18:57,372 | DEBUG   | Dummy-168      | gitdesk.task | 任务开始: 生成差异 dist/GitDeskData/repos.json
+2026-10-18 13:18:57,376 | DEBUG   | Dummy-168      | gitdesk.task | 任务完成: 生成差异 dist/GitDeskData/repos.json
+2026-10-18 13:18:58,749 | DEBUG   | Dummy-169      | gitdesk.task | 任务开始: 变更检测
+2026-10-18 13:18:58,782 | DEBUG   | Dummy-169      | gitdesk.task | 任务完成: 变更检测
+2026-10-18 13:19:03,754 | DEBUG   | Dummy-170      | gitdesk.task | 任务开始: 变更检测
+2026-10-18 13:19:03,793 | DEBUG   | Dummy-170      | gitdesk.task | 任务完成: 变更检测
+2026-10-18 13:19:08,159 | INFO    | MainThread     | gitdesk.ui | GitDesk 退出
